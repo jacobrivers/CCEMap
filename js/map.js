@@ -1,0 +1,668 @@
+/* ── NiCE CXone Global Map – map.js ─────────────────────────────────────── */
+/* Architecture:
+ *   config.json  → dataSource: "local" | "github"
+ *   data/locations.json + data/platforms.json  ← canonical source files
+ *   localStorage  ← working copy for in-browser edits
+ *   Export Settings → download nice-cxone-map-settings.json → edit → Import
+ */
+
+// ─── Defaults ─────────────────────────────────────────────────────────────────
+const DEFAULT_TYPE_CFG = {
+  cxone: { color: '#2B8EFF', label: 'CXone Software + Cognigy AI' },
+  voice: { color: '#8B5CF6', label: 'Voice POP' },
+  sov:   { color: '#F59E0B', label: 'SOV Region + Voice POP' },
+};
+const US_STATES = [
+  'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
+  'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
+  'Louisiana','Maine','Maryland','Massachusetts','Michigan','Minnesota','Mississippi',
+  'Missouri','Montana','Nebraska','Nevada','New Hampshire','New Jersey','New Mexico',
+  'New York','North Carolina','North Dakota','Ohio','Oklahoma','Oregon','Pennsylvania',
+  'Rhode Island','South Carolina','South Dakota','Tennessee','Texas','Utah','Vermont',
+  'Virginia','Washington','West Virginia','Wisconsin','Wyoming','District of Columbia'
+];
+const ICON_EM    = { circle:'⬤', pin:'📍', star:'★', square:'■', diamond:'◆' };
+const PLAT_COLORS = ['#2B8EFF','#8B5CF6','#F59E0B','#22c55e','#f97316','#e879f9','#06b6d4','#a3e635','#fb7185','#a78bfa'];
+
+// ESRI Canvas tiles — English labels, excellent land/water contrast
+const TILES = {
+  darkBase:  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  darkRef:   'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  lightBase: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
+  lightRef:  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+};
+const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ';
+
+// ─── Mutable state ────────────────────────────────────────────────────────────
+let locations = [], platforms = [], typeConfig = {};
+let markerMap = {}, layerOn = { cxone:true, voice:true, sov:true };
+let platformFilter = new Set(), pfTemp = new Set();
+let isDark = true, labelsOn = true, panelOpen = false;
+let editingId = null, selIconVal = 'circle';
+let sortKey = 'name', sortDir = 1;
+let undoStack = [], toastTimer = null;
+let map, baseLayer, refLayer, legendEl = null;
+let cfg = {};
+let srcLocs = null, srcPlats = null;
+let pmWorking = [], mtWorking = {};
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function tryParseArr(s) { try { const d=JSON.parse(s); return Array.isArray(d)&&d.length?d:null; } catch { return null; } }
+function tryParseObj(s) { try { const d=JSON.parse(s); return d&&typeof d==='object'&&!Array.isArray(d)?d:null; } catch { return null; } }
+function clone(o) { return JSON.parse(JSON.stringify(o)); }
+
+async function fetchJSON(url) {
+  try {
+    const r = await fetch(url, { cache: 'no-cache' });
+    if (!r.ok) throw new Error(r.status);
+    return await r.json();
+  } catch { return null; }
+}
+
+// ─── Boot ─────────────────────────────────────────────────────────────────────
+async function boot() {
+  setLoadingMsg('Loading configuration…');
+
+  cfg = await fetchJSON('./config.json') || {};
+  const dataSource = cfg.dataSource || 'local';
+  const githubBase = cfg.githubRawBase || '';
+
+  // Restore typeConfig from localStorage, then theme/labels
+  typeConfig = tryParseObj(localStorage.getItem('nice_typecfg')) || clone(DEFAULT_TYPE_CFG);
+  const storedTheme  = localStorage.getItem('nice_theme');
+  const storedLabels = localStorage.getItem('nice_labels');
+  isDark   = storedTheme  ? storedTheme==='dark'     : (cfg.defaultTheme||'dark')==='dark';
+  labelsOn = storedLabels ? JSON.parse(storedLabels) : cfg.defaultLabels !== false;
+
+  document.body.className = isDark ? 'dark' : 'light';
+
+  // Load data from configured source
+  setLoadingMsg(dataSource === 'github' ? 'Fetching data from GitHub…' : 'Loading local data files…');
+  const base = dataSource === 'github' ? githubBase : './data/';
+  [srcLocs, srcPlats] = await Promise.all([
+    fetchJSON(base + 'locations.json'),
+    fetchJSON(base + 'platforms.json'),
+  ]);
+
+  // Resolve working data (localStorage overrides source — it's the working copy)
+  locations = tryParseArr(localStorage.getItem('nice_locs'))  || srcLocs  || [];
+  platforms = tryParseArr(localStorage.getItem('nice_plats')) || srcPlats || [];
+
+  if (!locations.length || !platforms.length) {
+    showLoadingError(dataSource, base); return;
+  }
+
+  const badge = document.getElementById('source-badge');
+  if (badge) {
+    badge.textContent = dataSource === 'github' ? '☁ GitHub' : '💾 Local';
+    badge.className   = 'source-badge ' + (dataSource === 'github' ? 'github' : '');
+  }
+
+  setLoadingMsg('Rendering map…');
+  initMap();
+
+  setTimeout(() => {
+    const ov = document.getElementById('loading-overlay');
+    if (ov) { ov.classList.add('hidden'); setTimeout(() => ov.remove(), 500); }
+  }, 300);
+}
+
+function setLoadingMsg(msg) { const el=document.getElementById('loading-msg'); if(el) el.textContent=msg; }
+
+function showLoadingError(dataSource, base) {
+  const el = document.getElementById('loading-msg'); if (!el) return;
+  el.className = 'loading-err';
+  if (dataSource === 'local') {
+    el.innerHTML = `<strong>Could not load data files.</strong><br><br>
+      This map must be served from a web server — it cannot be opened directly as a file.<br><br>
+      <strong>Quick fix:</strong> Open a terminal in the <code>nice-cxone-map</code> folder and run:<br>
+      <code>python -m http.server 8080</code><br>
+      then open <a onclick="window.open('http://localhost:8080')">http://localhost:8080</a> in your browser.<br><br>
+      See <strong>README.md</strong> for full setup options.`;
+  } else {
+    el.innerHTML = `<strong>Could not load data from GitHub.</strong><br><br>
+      Check that <code>config.json → githubRawBase</code> is correct and the repository is accessible.<br>
+      Tried: <code>${base}</code>`;
+  }
+}
+
+// ─── Map init ─────────────────────────────────────────────────────────────────
+function initMap() {
+  map = L.map('map', { center:[20,10], zoom:2, minZoom:2 });
+  applyTiles();
+
+  const leg = L.control({ position:'bottomright' });
+  leg.onAdd = () => { legendEl = L.DomUtil.create('div','map-legend'); refreshLegend(); return legendEl; };
+  leg.addTo(map);
+
+  map.on('contextmenu', e => {
+    document.getElementById('m-lat').value = e.latlng.lat.toFixed(4);
+    document.getElementById('m-lng').value = e.latlng.lng.toFixed(4);
+    document.getElementById('geo-st').textContent = 'Coordinates set from map click ✓';
+    document.getElementById('geo-st').className = 'geo-st ok';
+    openModal(null);
+  });
+
+  document.getElementById('theme-btn').textContent  = isDark   ? '🌙 Dark' : '☀️ Light';
+  document.getElementById('labels-btn').textContent = labelsOn ? '🏷️ Labels' : '🏷️ No Labels';
+  if (!labelsOn) document.getElementById('labels-btn').classList.add('active');
+
+  renderAll();
+  refreshLayerButtons();
+}
+
+function refreshLegend() {
+  if (!legendEl) return;
+  legendEl.innerHTML = `<div class="leg-t">Marker Types</div>` +
+    Object.entries(typeConfig).map(([,c]) =>
+      `<div class="li"><div class="ld" style="background:${c.color}"></div>${c.label}</div>`
+    ).join('') +
+    `<div style="margin-top:6px;font-size:10px;color:var(--muted)">Click marker for details<br>Right-click map to add pin</div>`;
+}
+
+function refreshLayerButtons() {
+  ['cxone','voice','sov'].forEach(t => {
+    const dot = document.getElementById('dot-' + t);
+    if (dot) dot.style.background = typeConfig[t]?.color || '#888';
+    const btn = document.querySelector(`.layer-btn[data-layer="${t}"]`);
+    if (btn && btn.classList.contains('active')) {
+      btn.style.color = typeConfig[t]?.color || '';
+      btn.style.borderColor = typeConfig[t]?.color || '';
+    }
+  });
+  const allDot = document.getElementById('dot-all');
+  if (allDot) allDot.style.background = `linear-gradient(135deg,${typeConfig.cxone?.color||'#2B8EFF'},${typeConfig.voice?.color||'#8B5CF6'})`;
+  buildTypeSelect(document.getElementById('m-type')?.value || 'cxone');
+}
+
+// ─── Tiles ────────────────────────────────────────────────────────────────────
+function applyTiles() {
+  if (baseLayer) map.removeLayer(baseLayer);
+  if (refLayer)  map.removeLayer(refLayer);
+  baseLayer = L.tileLayer(isDark ? TILES.darkBase : TILES.lightBase, { attribution:ESRI_ATTR, maxZoom:19 }).addTo(map);
+  if (labelsOn) refLayer = L.tileLayer(isDark ? TILES.darkRef : TILES.lightRef, { attribution:'', maxZoom:19 }).addTo(map);
+  baseLayer.bringToBack();
+}
+function toggleTheme() {
+  isDark = !isDark; document.body.className = isDark ? 'dark' : 'light';
+  document.getElementById('theme-btn').textContent = isDark ? '🌙 Dark' : '☀️ Light';
+  applyTiles(); persist();
+}
+function toggleLabels() {
+  labelsOn = !labelsOn;
+  const btn = document.getElementById('labels-btn');
+  btn.textContent = labelsOn ? '🏷️ Labels' : '🏷️ No Labels';
+  btn.classList.toggle('active', !labelsOn);
+  applyTiles(); persist();
+}
+
+// ─── Icon builder ─────────────────────────────────────────────────────────────
+function buildIcon(type, shape) {
+  const c = (typeConfig[type] || DEFAULT_TYPE_CFG[type]).color, s=24, r=12;
+  let html, iS, iA, pA;
+  switch (shape) {
+    case 'pin':
+      html = `<svg width="20" height="28" viewBox="0 0 20 28"><path d="M10 1C5 1 1 5 1 10c0 6 9 17 9 17s9-11 9-17C19 5 15 1 10 1z" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/><circle cx="10" cy="10" r="4" fill="rgba(255,255,255,.85)"/></svg>`;
+      iS=[20,28]; iA=[10,27]; pA=[0,-28]; break;
+    case 'star': {
+      const pts = Array.from({length:5}, (_,i) => {
+        const a=(i*72-90)*Math.PI/180, b=(i*72-54)*Math.PI/180;
+        return `${r+r*.9*Math.cos(a)},${r+r*.9*Math.sin(a)} ${r+r*.42*Math.cos(b)},${r+r*.42*Math.sin(b)}`;
+      }).join(' ');
+      html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><polygon points="${pts}" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
+      iS=[s,s]; iA=[r,r]; pA=[0,-r]; break;
+    }
+    case 'square':
+      html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><rect x="2" y="2" width="${s-4}" height="${s-4}" rx="3" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/></svg>`;
+      iS=[s,s]; iA=[r,r]; pA=[0,-r]; break;
+    case 'diamond':
+      html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><polygon points="${r},2 ${s-2},${r} ${r},${s-2} 2,${r}" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/></svg>`;
+      iS=[s,s]; iA=[r,r]; pA=[0,-r]; break;
+    default:
+      html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><circle cx="${r}" cy="${r}" r="${r-2}" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="2"/></svg>`;
+      iS=[s,s]; iA=[r,r]; pA=[0,-r];
+  }
+  return L.divIcon({ className:'', html, iconSize:iS, iconAnchor:iA, popupAnchor:pA });
+}
+
+// ─── Tags ─────────────────────────────────────────────────────────────────────
+function platColor(name) {
+  const idx = platforms.findIndex(p => p.name === name);
+  const c   = PLAT_COLORS[Math.max(0,idx) % PLAT_COLORS.length];
+  return { bg: c+'28', fg: c };
+}
+function tagHTML(name) { const {bg,fg}=platColor(name); return `<span class="tag" style="background:${bg};color:${fg}">${name}</span>`; }
+
+// ─── Popup ────────────────────────────────────────────────────────────────────
+function cityLine(loc) {
+  const cityState = [loc.city, loc.state].filter(Boolean).join(', ');
+  return [cityState, loc.country, loc.region].filter(Boolean).join(' · ');
+}
+function popupHTML(loc) {
+  const tags  = (loc.platforms||[]).map(tagHTML).join('');
+  const icons = Object.keys(ICON_EM).map(k =>
+    `<div class="ipick ${loc.icon===k?'sel':''}" onclick="chIcon('${loc.id}','${k}')" title="${k}">${ICON_EM[k]}</div>`
+  ).join('');
+  const cfg = typeConfig[loc.type] || DEFAULT_TYPE_CFG[loc.type] || {label:'Unknown'};
+  return `<div class="pu-title">${loc.name}</div>
+    <div class="pu-sub">${cityLine(loc)}</div>
+    <div class="pu-tags">${tags || tagHTML(cfg.label)}</div>
+    <div class="icon-pick-row"><span>Icon:</span>${icons}</div>
+    <div class="pu-btns">
+      <button class="pu-btn" onclick="openModal('${loc.id}')">✏️ Edit</button>
+      <button class="pu-btn del" onclick="removeLoc('${loc.id}')">🗑 Remove</button>
+    </div>`;
+}
+function chIcon(id, shape) {
+  const loc = locations.find(l => l.id===id); if (!loc) return;
+  loc.icon = shape; persist();
+  const m = markerMap[id];
+  if (m) { m.setIcon(buildIcon(loc.type,shape)); m.setPopupContent(popupHTML(loc)); }
+  renderTable(); syncGpinBtn();
+}
+
+// ─── Visibility ───────────────────────────────────────────────────────────────
+function isVisible(loc) {
+  if (!layerOn[loc.type]) return false;
+  if (platformFilter.size === 0) return true;
+  return (loc.platforms||[]).some(p => platformFilter.has(p));
+}
+function applyAllVisibility() {
+  locations.forEach(loc => {
+    const m = markerMap[loc.id]; if (!m) return;
+    if (isVisible(loc)) map.addLayer(m); else map.removeLayer(m);
+  });
+}
+
+// ─── Markers ──────────────────────────────────────────────────────────────────
+function addMarker(loc) {
+  const m = L.marker([loc.lat, loc.lng], { icon: buildIcon(loc.type, loc.icon||'circle') });
+  m.bindPopup(popupHTML(loc), { maxWidth:320 }); m.addTo(map);
+  if (!isVisible(loc)) map.removeLayer(m);
+  markerMap[loc.id] = m;
+}
+function removeLoc(id) {
+  map.closePopup();
+  const loc = locations.find(l => l.id===id); if (!loc) return;
+  undoStack.push({...loc});
+  if (markerMap[id]) map.removeLayer(markerMap[id]);
+  delete markerMap[id];
+  locations = locations.filter(l => l.id!==id);
+  persist(); updateCounts(); renderTable(); showToast(`"${loc.name}" removed`);
+}
+function renderAll() {
+  Object.values(markerMap).forEach(m => map.removeLayer(m)); markerMap = {};
+  locations.forEach(addMarker); updateCounts(); renderTable(); syncGpinBtn();
+}
+function updateCounts() {
+  const c = { cxone:0, voice:0, sov:0 };
+  locations.forEach(l => c[l.type]++);
+  document.getElementById('cnt-cxone').textContent = c.cxone;
+  document.getElementById('cnt-voice').textContent = c.voice;
+  document.getElementById('cnt-sov').textContent   = c.sov;
+  document.getElementById('cnt-all').textContent   = locations.length;
+  document.getElementById('stat-total').textContent = locations.length;
+  document.getElementById('sp-count').textContent  = locations.length + ' total';
+}
+
+// ─── Layer toggle ─────────────────────────────────────────────────────────────
+function toggleLayer(layer) {
+  if (layer === 'all') {
+    const on = Object.values(layerOn).some(v => !v);
+    ['cxone','voice','sov'].forEach(t => { layerOn[t]=on; setAct(t,on); });
+    setAct('all', on);
+  } else {
+    layerOn[layer] = !layerOn[layer];
+    setAct(layer, layerOn[layer]);
+    setAct('all', Object.values(layerOn).every(v => v));
+  }
+  applyAllVisibility();
+}
+function setAct(layer, on) {
+  const b = document.querySelector(`.layer-btn[data-layer="${layer}"]`); if (!b) return;
+  b.classList.toggle('active', on);
+  if (on && typeConfig[layer]) { b.style.color=typeConfig[layer].color; b.style.borderColor=typeConfig[layer].color; }
+  else { b.style.color=''; b.style.borderColor=''; }
+}
+
+// ─── Global pin shape ─────────────────────────────────────────────────────────
+function setAllIcons(shape) {
+  if (shape === 'mixed') return;
+  locations.forEach(loc => {
+    loc.icon = shape;
+    const m = markerMap[loc.id];
+    if (m) { m.setIcon(buildIcon(loc.type,shape)); m.setPopupContent(popupHTML(loc)); }
+  });
+  persist(); renderTable(); syncGpinBtn();
+}
+function syncGpinBtn() {
+  const shapes = [...new Set(locations.map(l => l.icon||'circle'))];
+  const active = shapes.length===1 ? shapes[0] : 'mixed';
+  document.querySelectorAll('.gpin-btn').forEach(b => b.classList.toggle('active', b.dataset.shape===active));
+}
+
+// ─── Platform filter modal ────────────────────────────────────────────────────
+function openPFModal() { pfTemp=new Set(platformFilter); buildPFModalGrid(); updatePFMatchCount(); document.getElementById('pf-overlay').classList.add('open'); }
+function closePFModal() { document.getElementById('pf-overlay').classList.remove('open'); }
+function buildPFModalGrid() {
+  const g = document.getElementById('pf-modal-grid'); g.innerHTML = '';
+  platforms.forEach((p,i) => {
+    const color = PLAT_COLORS[i%PLAT_COLORS.length];
+    const div = document.createElement('div');
+    div.className = 'pf-opt' + (pfTemp.has(p.name)?' checked':'');
+    div.onclick = () => {
+      if (pfTemp.has(p.name)) { pfTemp.delete(p.name); div.classList.remove('checked'); }
+      else                    { pfTemp.add(p.name);    div.classList.add('checked');    }
+      updatePFMatchCount();
+    };
+    div.innerHTML = `<input type="checkbox" ${pfTemp.has(p.name)?'checked':''} onclick="event.stopPropagation();this.parentElement.click()">
+      <div class="pf-swatch" style="background:${color}"></div><span>${p.name}</span>`;
+    g.appendChild(div);
+  });
+}
+function pfSelectAll() { platforms.forEach(p => pfTemp.add(p.name)); buildPFModalGrid(); updatePFMatchCount(); }
+function pfClearAll()  { pfTemp.clear(); buildPFModalGrid(); updatePFMatchCount(); }
+function updatePFMatchCount() {
+  const n = pfTemp.size===0 ? locations.length : locations.filter(l=>(l.platforms||[]).some(p=>pfTemp.has(p))).length;
+  document.getElementById('pf-match-count').textContent = pfTemp.size===0 ? 'Showing all pins' : `Matches: ${n} pin${n!==1?'s':''}`;
+}
+function applyPFModal() {
+  platformFilter = new Set(pfTemp);
+  const badge = document.getElementById('pf-badge');
+  if (platformFilter.size>0) { badge.style.display='inline'; badge.textContent=platformFilter.size; }
+  else badge.style.display='none';
+  document.getElementById('pf-btn').classList.toggle('active', platformFilter.size>0);
+  applyAllVisibility(); closePFModal();
+}
+
+// ─── Undo ─────────────────────────────────────────────────────────────────────
+function showToast(msg) {
+  clearTimeout(toastTimer);
+  const t=document.getElementById('toast'), bar=document.getElementById('toast-bar');
+  document.getElementById('toast-msg').textContent = msg;
+  bar.style.animation='none'; bar.offsetHeight; bar.style.animation='';
+  t.classList.add('show');
+  document.getElementById('undo-btn').style.display = 'flex';
+  toastTimer = setTimeout(() => t.classList.remove('show'), 5200);
+}
+function undoDelete() {
+  if (!undoStack.length) return;
+  const loc = undoStack.pop(); locations.push(loc); addMarker(loc);
+  persist(); updateCounts(); renderTable(); syncGpinBtn();
+  document.getElementById('toast').classList.remove('show');
+  if (!undoStack.length) document.getElementById('undo-btn').style.display='none';
+  map.flyTo([loc.lat,loc.lng], Math.max(map.getZoom(),4), {duration:1});
+}
+
+// ─── Side panel / table ───────────────────────────────────────────────────────
+function togglePanel() {
+  panelOpen = !panelOpen;
+  document.getElementById('side-panel').classList.toggle('hidden', !panelOpen);
+  document.getElementById('list-btn').classList.toggle('active', panelOpen);
+  if (panelOpen) renderTable();
+}
+function sortBy(key) {
+  if (sortKey===key) sortDir*=-1; else { sortKey=key; sortDir=1; }
+  document.querySelectorAll('thead th').forEach(th => th.classList.remove('sorted'));
+  const th = document.getElementById('th-'+key);
+  if (th) { th.classList.add('sorted'); th.textContent=({name:'Name',region:'Region',country:'Location'}[key])+(sortDir>0?' ↑':' ↓'); }
+  renderTable();
+}
+function renderTable() {
+  if (!panelOpen) return;
+  const q = (document.getElementById('sp-search').value||'').toLowerCase();
+  let rows = locations.filter(l => !q || [l.name,l.city,l.state,l.country,l.region,...(l.platforms||[])].join(' ').toLowerCase().includes(q));
+  rows.sort((a,b) => (a[sortKey]||'').localeCompare(b[sortKey]||'')*sortDir);
+  const tbody = document.getElementById('sp-tbody'); tbody.innerHTML = '';
+  rows.forEach(loc => {
+    const tags = (loc.platforms||[]).map(tagHTML).join('');
+    const locDisp = [loc.state, loc.country].filter(Boolean).join(', ') || '—';
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td class="nc" title="${loc.name}">${loc.name}</td>
+      <td class="dim" title="${loc.region||''}">${loc.region||'—'}</td>
+      <td class="dim" title="${locDisp}">${locDisp}</td>
+      <td><div class="tags">${tags||(()=>{const c=typeConfig[loc.type]||DEFAULT_TYPE_CFG[loc.type];return tagHTML(c.label)})()}</div></td>
+      <td><div class="row-actions">
+        <button class="act-btn fly"  title="Fly to" onclick="flyTo('${loc.id}')">🎯</button>
+        <button class="act-btn edit" title="Edit"   onclick="openModal('${loc.id}')">✏️</button>
+        <button class="act-btn del"  title="Remove" onclick="removeLoc('${loc.id}')">🗑</button>
+      </div></td>`;
+    tbody.appendChild(tr);
+  });
+}
+function flyTo(id) {
+  const loc = locations.find(l => l.id===id); if (!loc) return;
+  map.flyTo([loc.lat,loc.lng], Math.max(map.getZoom(),5), {duration:1.2});
+  setTimeout(() => markerMap[id]?.openPopup(), 1400);
+}
+
+// ─── Location modal ───────────────────────────────────────────────────────────
+const US_VARIANTS = ['usa','us','united states','united states of america'];
+function isUSA(v) { return US_VARIANTS.includes((v||'').trim().toLowerCase()); }
+
+function checkUSState() {
+  const v = document.getElementById('m-country').value;
+  const show = isUSA(v);
+  document.getElementById('state-row').style.display = show ? '' : 'none';
+  if (show) {
+    const sel = document.getElementById('m-state');
+    if (sel.options.length <= 1) {
+      US_STATES.forEach(s => { const o=document.createElement('option'); o.value=s; o.textContent=s; sel.appendChild(o); });
+    }
+  }
+}
+
+function buildTypeSelect(selected) {
+  const sel = document.getElementById('m-type'); if (!sel) return;
+  sel.innerHTML = Object.entries(typeConfig).map(([key,cfg]) =>
+    `<option value="${key}"${selected===key?' selected':''}>${cfg.label}</option>`
+  ).join('');
+}
+
+function buildModalPlatGrid(selected) {
+  const g = document.getElementById('m-plat-grid'); g.innerHTML = '';
+  platforms.forEach(p => {
+    const lbl = document.createElement('label'); lbl.className='plat-opt';
+    const chk = document.createElement('input'); chk.type='checkbox'; chk.value=p.name;
+    chk.checked = selected && selected.includes(p.name); chk.setAttribute('data-plat','1');
+    lbl.appendChild(chk); lbl.appendChild(document.createTextNode(' '+p.name)); g.appendChild(lbl);
+  });
+}
+function getSelectedPlats() { return Array.from(document.querySelectorAll('[data-plat]:checked')).map(e=>e.value); }
+
+function openModal(id) {
+  editingId = id;
+  const loc = id ? locations.find(l=>l.id===id) : null;
+  document.getElementById('modal-title').innerHTML = loc ? '✏️ Edit <span class="p">Location</span>' : '＋ Add <span class="p">Location</span>';
+  document.getElementById('modal-save-btn').textContent = loc ? 'Save Changes' : 'Add to Map';
+  document.getElementById('m-name').value    = loc?.name    || '';
+  document.getElementById('m-city').value    = loc?.city    || '';
+  document.getElementById('m-country').value = loc?.country || '';
+  document.getElementById('m-region').value  = loc?.region  || '';
+  document.getElementById('m-lat').value     = loc?.lat     || '';
+  document.getElementById('m-lng').value     = loc?.lng     || '';
+  buildModalPlatGrid(loc?.platforms||[]);
+  buildTypeSelect(loc?.type||'cxone');
+  selIcon(loc?.icon||'circle');
+  checkUSState();
+  if (loc?.state) document.getElementById('m-state').value = loc.state;
+  document.getElementById('geo-st').textContent = 'or right-click the map to set coordinates';
+  document.getElementById('geo-st').className = 'geo-st';
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() { document.getElementById('modal').classList.remove('open'); editingId=null; }
+function selIcon(shape) { selIconVal=shape; document.querySelectorAll('#m-icon-picker .iopt').forEach(el=>el.classList.toggle('sel',el.dataset.icon===shape)); }
+function clearCoords() {
+  if (!editingId) {
+    document.getElementById('m-lat').value=''; document.getElementById('m-lng').value='';
+    document.getElementById('geo-st').textContent=''; document.getElementById('geo-st').className='geo-st';
+  }
+}
+async function geocode() {
+  const name = document.getElementById('m-name').value.trim(); if (!name) { alert('Enter a location name first.'); return; }
+  const st = document.getElementById('geo-st'); st.textContent='Looking up…'; st.className='geo-st';
+  try {
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1&addressdetails=1`,{headers:{'Accept-Language':'en'}});
+    const d = await r.json(); if (!d.length) throw 0;
+    document.getElementById('m-lat').value = parseFloat(d[0].lat).toFixed(4);
+    document.getElementById('m-lng').value = parseFloat(d[0].lon).toFixed(4);
+    if (!document.getElementById('m-city').value && d[0].address)
+      document.getElementById('m-city').value = d[0].address.city||d[0].address.town||d[0].address.village||'';
+    if (!document.getElementById('m-country').value && d[0].address)
+      document.getElementById('m-country').value = d[0].address.country||'';
+    checkUSState();
+    if (d[0].address?.country_code==='us' && d[0].address?.state)
+      document.getElementById('m-state').value = d[0].address.state;
+    st.textContent = '✓ '+d[0].display_name.split(',').slice(0,2).join(','); st.className='geo-st ok';
+  } catch {
+    st.textContent='Not found — enter coordinates manually.'; st.className='geo-st err';
+  }
+}
+function saveModal() {
+  const name = document.getElementById('m-name').value.trim();
+  const lat  = parseFloat(document.getElementById('m-lat').value);
+  const lng  = parseFloat(document.getElementById('m-lng').value);
+  if (!name) { alert('Enter a location name.'); return; }
+  if (isNaN(lat)||isNaN(lng)) { alert('Coordinates required. Use "Look up from name" or right-click the map.'); return; }
+  const country = document.getElementById('m-country').value.trim();
+  const data = {
+    name, city:document.getElementById('m-city').value.trim(),
+    state: isUSA(country) ? document.getElementById('m-state').value : '',
+    country, region:document.getElementById('m-region').value,
+    type:document.getElementById('m-type').value,
+    platforms:getSelectedPlats(), icon:selIconVal, lat, lng,
+  };
+  if (editingId) {
+    const idx = locations.findIndex(l=>l.id===editingId);
+    if (idx>-1) {
+      locations[idx] = {...locations[idx],...data};
+      const loc=locations[idx], m=markerMap[editingId];
+      if (m) { m.setLatLng([loc.lat,loc.lng]); m.setIcon(buildIcon(loc.type,loc.icon)); m.setPopupContent(popupHTML(loc)); if(!isVisible(loc)) map.removeLayer(m); else map.addLayer(m); }
+    }
+  } else {
+    const loc = {id:'c_'+Date.now(),...data}; locations.push(loc); addMarker(loc);
+    map.flyTo([lat,lng], Math.max(map.getZoom(),5), {duration:1.2});
+    setTimeout(() => markerMap[loc.id]?.openPopup(), 1400);
+  }
+  persist(); updateCounts(); renderTable(); syncGpinBtn(); closeModal();
+}
+
+// ─── Platform manager ─────────────────────────────────────────────────────────
+function openPlatformMgr() { pmWorking=platforms.map(p=>({...p})); renderPMList(); document.getElementById('pm-overlay').classList.add('open'); }
+function closePM() { document.getElementById('pm-overlay').classList.remove('open'); }
+function renderPMList() {
+  const list=document.getElementById('pm-list'); list.innerHTML='';
+  pmWorking.forEach((p,i) => {
+    const row=document.createElement('div'); row.className='pm-row';
+    const sw=document.createElement('div'); sw.className='pm-swatch'; sw.style.background=PLAT_COLORS[i%PLAT_COLORS.length];
+    const inp=document.createElement('input'); inp.className='pm-name-inp'; inp.value=p.name;
+    inp.onchange=()=>{pmWorking[i].name=inp.value.trim()};
+    const del=document.createElement('button'); del.className='pm-del-btn'; del.textContent='✕';
+    del.onclick=()=>{if(confirm(`Remove platform "${p.name}"?`)){pmWorking.splice(i,1);renderPMList()}};
+    row.appendChild(sw); row.appendChild(inp); row.appendChild(del); list.appendChild(row);
+  });
+}
+function addPlatform() {
+  const inp=document.getElementById('pm-new-name'), name=inp.value.trim(); if(!name) return;
+  if(pmWorking.find(p=>p.name.toLowerCase()===name.toLowerCase())){alert('Already exists.');return}
+  pmWorking.push({id:'p_'+Date.now(),name}); renderPMList(); inp.value='';
+}
+function savePlatforms() { platforms=pmWorking.map(p=>({...p})); persist(); closePM(); }
+
+// ─── Marker type editor ───────────────────────────────────────────────────────
+function openMT() { mtWorking=clone(typeConfig); renderMTList(); document.getElementById('mt-overlay').classList.add('open'); }
+function closeMT() { document.getElementById('mt-overlay').classList.remove('open'); }
+function renderMTList() {
+  const list=document.getElementById('mt-list'); list.innerHTML='';
+  Object.entries(mtWorking).forEach(([key,cfg]) => {
+    const row=document.createElement('div'); row.className='mt-row';
+    row.innerHTML=`
+      <span class="mt-key">${key}</span>
+      <input type="color" class="mt-color-inp" value="${cfg.color}"
+        oninput="mtWorking['${key}'].color=this.value;document.getElementById('mt-prev-${key}').style.background=this.value">
+      <div class="mt-preview" id="mt-prev-${key}" style="background:${cfg.color}"></div>
+      <input type="text" class="mt-label-inp" value="${cfg.label}"
+        oninput="mtWorking['${key}'].label=this.value" placeholder="Label for ${key}">`;
+    list.appendChild(row);
+  });
+}
+function saveMT() {
+  typeConfig = clone(mtWorking);
+  locations.forEach(loc => {
+    const m = markerMap[loc.id];
+    if (m) { m.setIcon(buildIcon(loc.type,loc.icon||'circle')); m.setPopupContent(popupHTML(loc)); }
+  });
+  refreshLayerButtons(); refreshLegend(); persist(); closeMT();
+  showToast('Marker types updated ✓');
+}
+
+// ─── Export / Import / Reload ─────────────────────────────────────────────────
+function exportSettings() {
+  dlJSON('nice-cxone-map-settings.json', {
+    _version: 2,
+    _exported: new Date().toISOString(),
+    _note: 'NiCE CXone Map — full settings. Edit and Import to apply changes.',
+    locations, platforms, typeConfig,
+    theme: isDark ? 'dark' : 'light',
+    labels: labelsOn,
+  });
+}
+
+function importSettings() { document.getElementById('import-file').click(); }
+
+function handleImportFile(e) {
+  const file=e.target.files[0]; if(!file) return;
+  const reader=new FileReader();
+  reader.onload=evt=>{
+    try {
+      const d=JSON.parse(evt.target.result);
+      if(!d.locations||!d.platforms) throw new Error('Missing locations or platforms');
+      locations=d.locations; platforms=d.platforms;
+      if(d.typeConfig) typeConfig=d.typeConfig;
+      if(d.theme!==undefined){ isDark=d.theme==='dark'; document.body.className=isDark?'dark':'light'; document.getElementById('theme-btn').textContent=isDark?'🌙 Dark':'☀️ Light'; }
+      if(d.labels!==undefined){ labelsOn=d.labels; document.getElementById('labels-btn').textContent=labelsOn?'🏷️ Labels':'🏷️ No Labels'; document.getElementById('labels-btn').classList.toggle('active',!labelsOn); }
+      persist(); renderAll(); refreshLayerButtons(); refreshLegend(); applyTiles();
+      showToast('Settings imported ✓');
+    } catch(err){ alert('Import failed: '+err.message); }
+    e.target.value='';
+  };
+  reader.readAsText(file);
+}
+
+function reloadFromSource() {
+  if (!srcLocs && !srcPlats) { alert('No source data was loaded (check config.json and your data files).'); return; }
+  if (!confirm('Reload all data from source files? Your local changes will be overwritten.')) return;
+  if (srcLocs)  { locations=srcLocs;  localStorage.setItem('nice_locs',  JSON.stringify(locations)); }
+  if (srcPlats) { platforms=srcPlats; localStorage.setItem('nice_plats', JSON.stringify(platforms)); }
+  renderAll(); showToast('Reloaded from source ✓');
+}
+
+function dlJSON(filename, data) {
+  const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+// ─── Persist to localStorage ──────────────────────────────────────────────────
+function persist() {
+  try {
+    localStorage.setItem('nice_locs',    JSON.stringify(locations));
+    localStorage.setItem('nice_plats',   JSON.stringify(platforms));
+    localStorage.setItem('nice_typecfg', JSON.stringify(typeConfig));
+    localStorage.setItem('nice_theme',   isDark?'dark':'light');
+    localStorage.setItem('nice_labels',  JSON.stringify(labelsOn));
+  } catch {}
+}
+
+// ─── Event wiring ─────────────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('modal')     .addEventListener('click', e=>{if(e.target===document.getElementById('modal'))      closeModal()});
+  document.getElementById('pm-overlay').addEventListener('click', e=>{if(e.target===document.getElementById('pm-overlay')) closePM()});
+  document.getElementById('pf-overlay').addEventListener('click', e=>{if(e.target===document.getElementById('pf-overlay')) closePFModal()});
+  document.getElementById('mt-overlay').addEventListener('click', e=>{if(e.target===document.getElementById('mt-overlay')) closeMT()});
+  document.getElementById('m-name')    .addEventListener('keydown', e=>{if(e.key==='Enter') geocode()});
+  document.getElementById('pm-new-name').addEventListener('keydown', e=>{if(e.key==='Enter') addPlatform()});
+  document.getElementById('sp-search') .addEventListener('input', renderTable);
+  document.addEventListener('keydown', e=>{if((e.ctrlKey||e.metaKey)&&e.key==='z'){e.preventDefault();undoDelete()}});
+  boot();
+});

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NiCE CXone – Global AI CX Reach &amp; Coverage</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<link rel="stylesheet" href="css/map.css"/>
+</head>
+<body class="dark">
+
+<!-- Loading overlay (hidden once data loads) -->
+<div id="loading-overlay">
+  <div class="loading-logo">N<span class="p">i</span>CE CX<span class="p">one</span></div>
+  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
+  <div class="loading-msg" id="loading-msg">Initialising…</div>
+</div>
+
+<!-- Header -->
+<header>
+  <div class="logo">N<span class="p">i</span>CE &nbsp;<span style="font-weight:400">CX</span><span class="p">one</span></div>
+  <h1>Global AI CX Reach &amp; Coverage</h1>
+  <div class="stats">
+    <div class="pill"><strong>10</strong> Regions</div>
+    <div class="pill"><strong>28</strong> Inbound Carriers</div>
+    <div class="pill"><strong>27</strong> Outbound Carriers</div>
+    <div class="pill"><strong>33</strong> Voice POPs</div>
+    <div class="pill"><strong id="stat-total">—</strong> Locations</div>
+    <span id="source-badge" class="source-badge">—</span>
+  </div>
+</header>
+
+<!-- Controls -->
+<div class="controls">
+  <span class="clabel">Layers</span>
+  <button class="layer-btn active" data-layer="all"   onclick="toggleLayer('all')"  ><span class="dot" id="dot-all"   style="background:linear-gradient(135deg,#2B8EFF,#8B5CF6)"></span>All   <span class="cnt" id="cnt-all">—</span></button>
+  <button class="layer-btn active" data-layer="cxone" onclick="toggleLayer('cxone')"><span class="dot" id="dot-cxone" style="background:#2B8EFF"></span>CXone + Cognigy <span class="cnt" id="cnt-cxone">—</span></button>
+  <button class="layer-btn active" data-layer="voice" onclick="toggleLayer('voice')"><span class="dot" id="dot-voice" style="background:#8B5CF6"></span>Voice POP <span class="cnt" id="cnt-voice">—</span></button>
+  <button class="layer-btn active" data-layer="sov"   onclick="toggleLayer('sov')"  ><span class="dot" id="dot-sov"   style="background:#F59E0B"></span>SOV + Voice <span class="cnt" id="cnt-sov">—</span></button>
+
+  <div class="sep"></div>
+  <span class="clabel">Filter</span>
+  <button class="ctrl-btn" id="pf-btn" onclick="openPFModal()">🎛️ By Platform <span id="pf-badge" style="display:none;background:var(--nice-pink);color:#fff;border-radius:10px;padding:0 5px;font-size:10px;margin-left:2px"></span></button>
+
+  <div class="sep"></div>
+  <span class="clabel">All Pins</span>
+  <div class="gpin-group">
+    <button class="gpin-btn active" data-shape="circle"  onclick="setAllIcons('circle')"  title="All pins: Circle">⬤</button>
+    <button class="gpin-btn"        data-shape="pin"     onclick="setAllIcons('pin')"     title="All pins: Pin">📍</button>
+    <button class="gpin-btn"        data-shape="star"    onclick="setAllIcons('star')"    title="All pins: Star">★</button>
+    <button class="gpin-btn"        data-shape="square"  onclick="setAllIcons('square')"  title="All pins: Square">■</button>
+    <button class="gpin-btn"        data-shape="diamond" onclick="setAllIcons('diamond')" title="All pins: Diamond">◆</button>
+    <button class="gpin-btn gpin-mixed" data-shape="mixed" title="Mixed (per-pin icons)">Mix</button>
+  </div>
+
+  <div class="sep"></div>
+  <button class="ctrl-btn" id="theme-btn"  onclick="toggleTheme()">🌙 Dark</button>
+  <button class="ctrl-btn" id="labels-btn" onclick="toggleLabels()">🏷️ Labels</button>
+  <button class="ctrl-btn" id="list-btn"   onclick="togglePanel()">📋 List</button>
+  <button class="ctrl-btn" id="undo-btn"   onclick="undoDelete()" style="display:none">↩️ Undo</button>
+  <button class="ctrl-btn" onclick="openPlatformMgr()">⚙️ Platforms</button>
+  <button class="ctrl-btn" onclick="openMT()">🎨 Marker Types</button>
+  <button class="ctrl-btn" onclick="reloadFromSource()" title="Reload data from source files">🔄 Sync</button>
+  <button class="ctrl-btn" onclick="exportSettings()" title="Export all settings as JSON">💾 Export</button>
+  <button class="ctrl-btn" onclick="importSettings()" title="Import settings JSON">📂 Import</button>
+  <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)">
+
+  <div class="spacer"></div>
+  <button class="add-btn" onclick="openModal(null)">＋ Add Location</button>
+</div>
+
+<!-- Main -->
+<div class="main">
+  <div id="map"></div>
+
+  <!-- Side panel -->
+  <div class="side-panel hidden" id="side-panel">
+    <div class="sp-header">
+      <span class="sp-title">📍 Locations</span>
+      <span class="sp-count" id="sp-count">—</span>
+      <button class="ctrl-btn" style="padding:2px 8px;font-size:11px;" onclick="openModal(null)">＋ Add</button>
+    </div>
+    <div class="sp-search">
+      <input type="text" id="sp-search" placeholder="Search name, city, state, region, country, platform…"/>
+    </div>
+    <div class="sp-table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th onclick="sortBy('name')"    id="th-name">Name ↕</th>
+            <th onclick="sortBy('region')"  id="th-region">Region ↕</th>
+            <th onclick="sortBy('country')" id="th-country">Location ↕</th>
+            <th>Platforms</th>
+            <th style="width:76px;text-align:center">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="sp-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Undo toast -->
+<div class="toast" id="toast">
+  <span id="toast-msg"></span>
+  <button class="toast-undo" onclick="undoDelete()">Undo</button>
+  <div class="toast-bar" id="toast-bar"></div>
+</div>
+
+<!-- Add / Edit Location Modal -->
+<div class="overlay" id="modal">
+  <div class="modal">
+    <h2 id="modal-title">＋ Add <span class="p">Location</span></h2>
+    <div class="frow">
+      <div class="fg" style="flex:2"><label>Display Name</label><input type="text" id="m-name" placeholder="e.g. London &amp; Manchester" oninput="clearCoords()"/></div>
+      <div class="fg"><label>City</label><input type="text" id="m-city" placeholder="e.g. London"/></div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Country</label><input type="text" id="m-country" placeholder="e.g. United Kingdom" oninput="checkUSState()"/></div>
+      <div class="fg"><label>Region</label>
+        <select id="m-region"><option value="">— Select —</option><option>North America</option><option>EMEA</option><option>APAC</option><option>LATAM</option><option>MEA</option></select>
+      </div>
+    </div>
+    <div class="fg" id="state-row" style="display:none">
+      <label>State</label>
+      <select id="m-state"><option value="">— Select State —</option></select>
+    </div>
+    <div class="fg"><label>Platforms / Services</label><div class="plat-grid" id="m-plat-grid"></div></div>
+    <div class="fg"><label>Marker Colour</label>
+      <select id="m-type"></select>
+    </div>
+    <div class="fg"><label>Pin Icon</label>
+      <div class="icon-picker-row" id="m-icon-picker">
+        <div class="iopt sel" data-icon="circle"  onclick="selIcon('circle')" ><span>⬤</span>Circle</div>
+        <div class="iopt"     data-icon="pin"     onclick="selIcon('pin')"    ><span>📍</span>Pin</div>
+        <div class="iopt"     data-icon="star"    onclick="selIcon('star')"   ><span>★</span>Star</div>
+        <div class="iopt"     data-icon="square"  onclick="selIcon('square')" ><span>■</span>Square</div>
+        <div class="iopt"     data-icon="diamond" onclick="selIcon('diamond')"><span>◆</span>Diamond</div>
+      </div>
+    </div>
+    <div class="frow">
+      <div class="fg"><label>Latitude</label> <input type="number" id="m-lat" placeholder="e.g. 51.5074" step=".0001"/></div>
+      <div class="fg"><label>Longitude</label><input type="number" id="m-lng" placeholder="e.g. -0.1278" step=".0001"/></div>
+    </div>
+    <div class="geocode-row">
+      <button class="geo-btn" onclick="geocode()">🔍 Look up from name</button>
+      <span class="geo-st" id="geo-st">or right-click the map to set coordinates</span>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-c" onclick="closeModal()">Cancel</button>
+      <button class="btn-s" id="modal-save-btn" onclick="saveModal()">Add to Map</button>
+    </div>
+  </div>
+</div>
+
+<!-- Platform Filter Modal -->
+<div class="overlay" id="pf-overlay">
+  <div class="modal" style="width:560px">
+    <h2>🎛️ Filter <span class="p">by Platform</span></h2>
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:14px">Show only pins that offer <strong>at least one</strong> selected platform. Uncheck all to show everything.</p>
+    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
+      <span class="pf-select-all" onclick="pfSelectAll()">Select all</span>
+      <span class="pf-clear-all"  onclick="pfClearAll()">Clear all</span>
+      <span style="flex:1"></span>
+      <span id="pf-match-count" style="font-size:11px;color:var(--muted)"></span>
+    </div>
+    <div class="pf-modal-grid" id="pf-modal-grid"></div>
+    <div class="modal-actions" style="margin-top:16px">
+      <button class="btn-c" onclick="closePFModal()">Cancel</button>
+      <button class="btn-s" onclick="applyPFModal()">Apply Filter</button>
+    </div>
+  </div>
+</div>
+
+<!-- Platform Manager Modal -->
+<div class="overlay" id="pm-overlay">
+  <div class="modal" style="width:420px">
+    <h2>⚙️ Manage <span class="p">Platforms</span></h2>
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Click a name to rename it. Changes are saved to your browser and included in Export.</p>
+    <div class="pm-list" id="pm-list"></div>
+    <div class="pm-add-row">
+      <input type="text" class="pm-add-inp" id="pm-new-name" placeholder="New platform name…"/>
+      <button class="pm-add-btn" onclick="addPlatform()">＋ Add</button>
+    </div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn-c" onclick="closePM()">Cancel</button>
+      <button class="btn-s" onclick="savePlatforms()">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Marker Type Editor Modal -->
+<div class="overlay" id="mt-overlay">
+  <div class="modal" style="width:480px">
+    <h2>🎨 Marker <span class="p">Types</span></h2>
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:16px">Customise the colour and label for each marker type. Changes apply to all pins, layer buttons, and the legend.</p>
+    <div id="mt-list"></div>
+    <div class="modal-actions" style="margin-top:14px">
+      <button class="btn-c" onclick="closeMT()">Cancel</button>
+      <button class="btn-s" onclick="saveMT()">Apply Changes</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="js/map.js"></script>
+</body>
+</html>
