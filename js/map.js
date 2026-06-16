@@ -8,10 +8,14 @@
 
 // ─── Defaults ─────────────────────────────────────────────────────────────────
 const DEFAULT_TYPE_CFG = {
-  cxone: { color: '#2B8EFF', label: 'CXone Software + Cognigy AI' },
-  voice: { color: '#8B5CF6', label: 'Voice POP' },
-  sov:   { color: '#F59E0B', label: 'SOV Region + Voice POP' },
+  appstack:     { color: '#2B8EFF', label: 'Application Stack' },
+  voicepop:     { color: '#8B5CF6', label: 'Voice POP' },
+  sovregion:    { color: '#F59E0B', label: 'SOV Region' },
+  fedramp:      { color: '#22c55e', label: 'FedRamp' },
+  sovvoice:     { color: '#f97316', label: 'SOV Voice' },
+  fedrampvoice: { color: '#e879f9', label: 'FedRamp Voice' },
 };
+const TYPE_FILES = ['appstack','voicepop','sovregion','fedramp','sovvoice','fedrampvoice'];
 const US_STATES = [
   'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
   'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
@@ -86,10 +90,14 @@ async function boot() {
   // Load data from configured source
   setLoadingMsg(dataSource === 'github' ? 'Fetching data from GitHub…' : 'Loading local data files…');
   const base = dataSource === 'github' ? githubBase : './data/';
-  [srcLocs, srcPlats] = await Promise.all([
-    fetchJSON(base + 'locations.json'),
+  const [typeResults, srcPlatsRaw] = await Promise.all([
+    Promise.all(TYPE_FILES.map(t =>
+      fetchJSON(base + t + '.json').then(r => Array.isArray(r) ? r : []).catch(() => [])
+    )),
     fetchJSON(base + 'platforms.json'),
   ]);
+  srcLocs  = typeResults.flat().length ? typeResults.flat() : await fetchJSON(base + 'locations.json');
+  srcPlats = srcPlatsRaw;
 
   // Resolve working data (localStorage overrides source — it's the working copy)
   locations = tryParseArr(localStorage.getItem('nice_locs'))  || srcLocs  || [];
@@ -591,6 +599,7 @@ function renderTable() {
       <td><div class="row-actions">
         <button class="act-btn fly"  title="Fly to" onclick="flyTo('${loc.id}')">🎯</button>
         <button class="act-btn edit" title="Edit"   onclick="openModal('${loc.id}')">✏️</button>
+        <button class="act-btn" title="Clone location" onclick="cloneLocation('${loc.id}')">📋</button>
         <button class="act-btn del"  title="Remove" onclick="removeLoc('${loc.id}')">🗑</button>
       </div></td>`;
     tbody.appendChild(tr);
@@ -600,6 +609,33 @@ function flyTo(id) {
   const loc = locations.find(l => l.id===id); if (!loc) return;
   map.flyTo([loc.lat,loc.lng], Math.max(map.getZoom(),5), {duration:1.2});
   setTimeout(() => markerMap[id]?.openPopup(), 1400);
+}
+
+function cloneLocation(id) {
+  const src = locations.find(l => l.id === id);
+  if (!src) return;
+  openModal(null);
+  document.getElementById('m-name').value    = 'Copy of ' + src.name;
+  document.getElementById('m-city').value    = src.city    || '';
+  document.getElementById('m-country').value = src.country || '';
+  document.getElementById('m-region').value  = src.region  || '';
+  document.getElementById('m-lat').value     = src.lat     || '';
+  document.getElementById('m-lng').value     = src.lng     || '';
+  document.getElementById('m-label').value   = src.label   || '';
+  document.getElementById('m-label-on').checked = src.labelOn || false;
+  const mPlat = document.getElementById('m-plat');
+  if (mPlat) mPlat.value = src.platform || '';
+  buildTypeSelect(src.type || 'appstack');
+  selIcon(src.icon || 'circle');
+  checkUSState();
+  if (src.state) {
+    setTimeout(() => { document.getElementById('m-state').value = src.state; }, 50);
+  }
+  const st = document.getElementById('geo-st');
+  if (src.lat && src.lng) {
+    st.textContent = `📍 ${src.lat}, ${src.lng} — cloned from ${src.name}`;
+    st.className = 'geo-st ok';
+  }
 }
 
 // ─── Location modal ───────────────────────────────────────────────────────────
@@ -641,7 +677,7 @@ function openModal(id) {
   const mPlat = document.getElementById('m-plat');
   mPlat.innerHTML = '<option value="">— Select platform —</option>' + platforms.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
   mPlat.value = loc?.platform || '';
-  buildTypeSelect(loc?.type||'cxone');
+  buildTypeSelect(loc?.type||'appstack');
   selIcon(loc?.icon||'circle');
   checkUSState();
   if (loc?.state) document.getElementById('m-state').value = loc.state;
@@ -1025,6 +1061,19 @@ function dlJSON(filename, data) {
   const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+
+function exportTypeFiles() {
+  const typeKeys = Object.keys(typeConfig);
+  let delay = 0;
+  typeKeys.forEach(typeKey => {
+    const entries = locations.filter(l => l.type === typeKey);
+    setTimeout(() => {
+      dlJSON(typeKey + '.json', entries);
+    }, delay);
+    delay += 300;
+  });
+  showToast(`Exporting ${typeKeys.length} data files — check your downloads folder.`);
 }
 
 // ─── Persist to localStorage ──────────────────────────────────────────────────

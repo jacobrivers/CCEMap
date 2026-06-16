@@ -251,6 +251,8 @@ body.dark  .leaflet-control-zoom a{background:#1a1d2e;color:#eef;border-color:#2
       <div class="dd-item" onclick="importSettings();closeDD('dd-settings')"><span class="dd-check"></span>📂 Import Settings</div>
       <div class="dd-sep"></div>
       <div class="dd-item" onclick="exportSourceFile();closeDD('dd-settings')"><span class="dd-check"></span>📦 Export Source File</div>
+      <div class="dd-sep"></div>
+      <div class="dd-item" onclick="exportTypeFiles();closeDD('dd-settings')"><span class="dd-check"></span>📂 Export Data Files</div>
     </div>
   </div>
   <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)">
@@ -410,66 +412,7 @@ body.dark  .leaflet-control-zoom a{background:#1a1d2e;color:#eef;border-color:#2
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
 // ── Default data ───────────────────────────────────────────────────────────────
-const DEFAULT_LOCATIONS = [
-  {"id": "culpeper_cxone", "name": "Culpeper, VA", "city": "Culpeper", "state": "Virginia", "country": "United States", "region": "North America", "platform": "CXone Software", "type": "cxone", "lat": 38.47, "lng": -77.99, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "culpeper_cognigy", "name": "Culpeper, VA", "city": "Culpeper", "state": "Virginia", "country": "United States", "region": "North America", "platform": "Cognigy AI", "type": "cxone", "lat": 38.47, "lng": -77.99, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "oregon_cxone", "name": "Oregon", "city": "Portland", "state": "Oregon", "country": "United States", "region": "North America", "platform": "CXone Software", "type": "cxone", "lat": 44.0, "lng": -120.5, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "oregon_cognigy", "name": "Oregon", "city": "Portland", "state": "Oregon", "country": "United States", "region": "North America", "platform": "Cognigy AI", "type": "cxone", "lat": 44.0, "lng": -120.5, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "la_voicepop", "name": "Los Angeles", "city": "Los Angeles", "state": "California", "country": "United States", "region": "North America", "platform": "Voice POP", "type": "voice", "lat": 34.05, "lng": -118.24, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "la_pstn", "name": "Los Angeles", "city": "Los Angeles", "state": "California", "country": "United States", "region": "North America", "platform": "PSTN Carrier", "type": "voice", "lat": 34.05, "lng": -118.24, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "miami_voicepop", "name": "Miami", "city": "Miami", "state": "Florida", "country": "United States", "region": "North America", "platform": "Voice POP", "type": "voice", "lat": 25.77, "lng": -80.19, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "miami_pstn", "name": "Miami", "city": "Miami", "state": "Florida", "country": "United States", "region": "North America", "platform": "PSTN Carrier", "type": "voice", "lat": 25.77, "lng": -80.19, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "dallas_sov", "name": "Dallas", "city": "Dallas", "state": "Texas", "country": "United States", "region": "North America", "platform": "FedRamp Region", "type": "sov", "lat": 32.78, "lng": -96.8, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "dallas_pstn", "name": "Dallas", "city": "Dallas", "state": "Texas", "country": "United States", "region": "North America", "platform": "PSTN Carrier", "type": "sov", "lat": 32.78, "lng": -96.8, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "toronto_voicepop", "name": "Toronto", "city": "Toronto", "state": "", "country": "Canada", "region": "North America", "platform": "Voice POP", "type": "voice", "lat": 43.65, "lng": -79.38, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "toronto_pstn", "name": "Toronto", "city": "Toronto", "state": "", "country": "Canada", "region": "North America", "platform": "PSTN Carrier", "type": "voice", "lat": 43.65, "lng": -79.38, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "montreal_voicepop", "name": "Montreal", "city": "Montreal", "state": "", "country": "Canada", "region": "North America", "platform": "Voice POP", "type": "voice", "lat": 45.5, "lng": -73.57, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "london_cxone", "name": "London", "city": "London", "state": "", "country": "United Kingdom", "region": "EMEA", "platform": "CXone Software", "type": "cxone", "lat": 51.51, "lng": -0.13, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "london_cognigy", "name": "London", "city": "London", "state": "", "country": "United Kingdom", "region": "EMEA", "platform": "Cognigy AI", "type": "cxone", "lat": 51.51, "lng": -0.13, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "london_pstn", "name": "London", "city": "London", "state": "", "country": "United Kingdom", "region": "EMEA", "platform": "PSTN Carrier", "type": "cxone", "lat": 51.51, "lng": -0.13, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "manchester_cxone", "name": "Manchester", "city": "Manchester", "state": "", "country": "United Kingdom", "region": "EMEA", "platform": "CXone Software", "type": "cxone", "lat": 53.48, "lng": -2.24, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "manchester_cognigy", "name": "Manchester", "city": "Manchester", "state": "", "country": "United Kingdom", "region": "EMEA", "platform": "Cognigy AI", "type": "cxone", "lat": 53.48, "lng": -2.24, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "manchester_pstn", "name": "Manchester", "city": "Manchester", "state": "", "country": "United Kingdom", "region": "EMEA", "platform": "PSTN Carrier", "type": "cxone", "lat": 53.48, "lng": -2.24, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "frankfurt_cxone", "name": "Frankfurt", "city": "Frankfurt", "state": "", "country": "Germany", "region": "EMEA", "platform": "CXone Software", "type": "cxone", "lat": 50.11, "lng": 8.68, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "frankfurt_cognigy", "name": "Frankfurt", "city": "Frankfurt", "state": "", "country": "Germany", "region": "EMEA", "platform": "Cognigy AI", "type": "cxone", "lat": 50.11, "lng": 8.68, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "munich_voicepop", "name": "Munich", "city": "Munich", "state": "", "country": "Germany", "region": "EMEA", "platform": "Voice POP", "type": "voice", "lat": 48.14, "lng": 11.58, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "dubai_cxone", "name": "Dubai", "city": "Dubai", "state": "", "country": "UAE", "region": "MEA", "platform": "CXone Software", "type": "cxone", "lat": 25.2, "lng": 55.27, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "dubai_cognigy", "name": "Dubai", "city": "Dubai", "state": "", "country": "UAE", "region": "MEA", "platform": "Cognigy AI", "type": "cxone", "lat": 25.2, "lng": 55.27, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "dubai_pstn", "name": "Dubai", "city": "Dubai", "state": "", "country": "UAE", "region": "MEA", "platform": "PSTN Carrier", "type": "cxone", "lat": 25.2, "lng": 55.27, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "abudhabi_cxone", "name": "Abu Dhabi", "city": "Abu Dhabi", "state": "", "country": "UAE", "region": "MEA", "platform": "CXone Software", "type": "cxone", "lat": 24.47, "lng": 54.37, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "abudhabi_cognigy", "name": "Abu Dhabi", "city": "Abu Dhabi", "state": "", "country": "UAE", "region": "MEA", "platform": "Cognigy AI", "type": "cxone", "lat": 24.47, "lng": 54.37, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "abudhabi_pstn", "name": "Abu Dhabi", "city": "Abu Dhabi", "state": "", "country": "UAE", "region": "MEA", "platform": "PSTN Carrier", "type": "cxone", "lat": 24.47, "lng": 54.37, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "mumbai_voicepop", "name": "Mumbai", "city": "Mumbai", "state": "", "country": "India", "region": "APAC", "platform": "Voice POP", "type": "voice", "lat": 19.08, "lng": 72.88, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "mumbai_pstn", "name": "Mumbai", "city": "Mumbai", "state": "", "country": "India", "region": "APAC", "platform": "PSTN Carrier", "type": "voice", "lat": 19.08, "lng": 72.88, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "hyderabad_voicepop", "name": "Hyderabad", "city": "Hyderabad", "state": "", "country": "India", "region": "APAC", "platform": "Voice POP", "type": "voice", "lat": 17.38, "lng": 78.49, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "hyderabad_pstn", "name": "Hyderabad", "city": "Hyderabad", "state": "", "country": "India", "region": "APAC", "platform": "PSTN Carrier", "type": "voice", "lat": 17.38, "lng": 78.49, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "singapore_cxone", "name": "Singapore", "city": "Singapore", "state": "", "country": "Singapore", "region": "APAC", "platform": "CXone Software", "type": "cxone", "lat": 1.35, "lng": 103.82, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "singapore_cognigy", "name": "Singapore", "city": "Singapore", "state": "", "country": "Singapore", "region": "APAC", "platform": "Cognigy AI", "type": "cxone", "lat": 1.35, "lng": 103.82, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "singapore_pstn", "name": "Singapore", "city": "Singapore", "state": "", "country": "Singapore", "region": "APAC", "platform": "PSTN Carrier", "type": "cxone", "lat": 1.35, "lng": 103.82, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "tokyo_cxone", "name": "Tokyo", "city": "Tokyo", "state": "", "country": "Japan", "region": "APAC", "platform": "CXone Software", "type": "cxone", "lat": 35.69, "lng": 139.69, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "tokyo_cognigy", "name": "Tokyo", "city": "Tokyo", "state": "", "country": "Japan", "region": "APAC", "platform": "Cognigy AI", "type": "cxone", "lat": 35.69, "lng": 139.69, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "tokyo_pstn", "name": "Tokyo", "city": "Tokyo", "state": "", "country": "Japan", "region": "APAC", "platform": "PSTN Carrier", "type": "cxone", "lat": 35.69, "lng": 139.69, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "osaka_cxone", "name": "Osaka", "city": "Osaka", "state": "", "country": "Japan", "region": "APAC", "platform": "CXone Software", "type": "cxone", "lat": 34.69, "lng": 135.5, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "osaka_cognigy", "name": "Osaka", "city": "Osaka", "state": "", "country": "Japan", "region": "APAC", "platform": "Cognigy AI", "type": "cxone", "lat": 34.69, "lng": 135.5, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "osaka_pstn", "name": "Osaka", "city": "Osaka", "state": "", "country": "Japan", "region": "APAC", "platform": "PSTN Carrier", "type": "cxone", "lat": 34.69, "lng": 135.5, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "seoul_voicepop", "name": "Seoul", "city": "Seoul", "state": "", "country": "South Korea", "region": "APAC", "platform": "Voice POP", "type": "voice", "lat": 37.57, "lng": 126.98, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "seoul_pstn", "name": "Seoul", "city": "Seoul", "state": "", "country": "South Korea", "region": "APAC", "platform": "PSTN Carrier", "type": "voice", "lat": 37.57, "lng": 126.98, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "sydney_cxone", "name": "Sydney", "city": "Sydney", "state": "", "country": "Australia", "region": "APAC", "platform": "CXone Software", "type": "cxone", "lat": -33.87, "lng": 151.21, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "sydney_cognigy", "name": "Sydney", "city": "Sydney", "state": "", "country": "Australia", "region": "APAC", "platform": "Cognigy AI", "type": "cxone", "lat": -33.87, "lng": 151.21, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "sydney_pstn", "name": "Sydney", "city": "Sydney", "state": "", "country": "Australia", "region": "APAC", "platform": "PSTN Carrier", "type": "cxone", "lat": -33.87, "lng": 151.21, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "melbourne_voicepop", "name": "Melbourne", "city": "Melbourne", "state": "", "country": "Australia", "region": "APAC", "platform": "Voice POP", "type": "voice", "lat": -37.81, "lng": 144.96, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "saopaulo_sov", "name": "Sao Paulo", "city": "Sao Paulo", "state": "", "country": "Brazil", "region": "LATAM", "platform": "SOV Region", "type": "sov", "lat": -23.55, "lng": -46.63, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "saopaulo_voicepop", "name": "Sao Paulo", "city": "Sao Paulo", "state": "", "country": "Brazil", "region": "LATAM", "platform": "Voice POP", "type": "sov", "lat": -23.55, "lng": -46.63, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "saopaulo_pstn", "name": "Sao Paulo", "city": "Sao Paulo", "state": "", "country": "Brazil", "region": "LATAM", "platform": "PSTN Carrier", "type": "sov", "lat": -23.55, "lng": -46.63, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "rio_sov", "name": "Rio de Janeiro", "city": "Rio de Janeiro", "state": "", "country": "Brazil", "region": "LATAM", "platform": "SOV Region", "type": "sov", "lat": -22.91, "lng": -43.17, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "rio_voicepop", "name": "Rio de Janeiro", "city": "Rio de Janeiro", "state": "", "country": "Brazil", "region": "LATAM", "platform": "Voice POP", "type": "sov", "lat": -22.91, "lng": -43.17, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "capetown_sov", "name": "Cape Town", "city": "Cape Town", "state": "", "country": "South Africa", "region": "MEA", "platform": "SOV Region", "type": "sov", "lat": -33.93, "lng": 18.42, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "capetown_voicepop", "name": "Cape Town", "city": "Cape Town", "state": "", "country": "South Africa", "region": "MEA", "platform": "Voice POP", "type": "sov", "lat": -33.93, "lng": 18.42, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "capetown_pstn", "name": "Cape Town", "city": "Cape Town", "state": "", "country": "South Africa", "region": "MEA", "platform": "PSTN Carrier", "type": "sov", "lat": -33.93, "lng": 18.42, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "johannesburg_sov", "name": "Johannesburg", "city": "Johannesburg", "state": "", "country": "South Africa", "region": "MEA", "platform": "SOV Region", "type": "sov", "lat": -26.2, "lng": 28.04, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "johannesburg_voicepop", "name": "Johannesburg", "city": "Johannesburg", "state": "", "country": "South Africa", "region": "MEA", "platform": "Voice POP", "type": "sov", "lat": -26.2, "lng": 28.04, "icon": "circle", "label": "", "labelOn": false},
-  {"id": "johannesburg_pstn", "name": "Johannesburg", "city": "Johannesburg", "state": "", "country": "South Africa", "region": "MEA", "platform": "PSTN Carrier", "type": "sov", "lat": -26.2, "lng": 28.04, "icon": "circle", "label": "", "labelOn": false}
-];
+const DEFAULT_LOCATIONS = [{"id":"culpeper_cxone","name":"Culpeper, VA","city":"Culpeper","state":"Virginia","country":"United States","region":"North America","platform":"CXone Software","type":"appstack","lat":38.47,"lng":-77.99,"icon":"circle","label":"","labelOn":false},{"id":"culpeper_cognigy","name":"Culpeper, VA","city":"Culpeper","state":"Virginia","country":"United States","region":"North America","platform":"Cognigy AI","type":"appstack","lat":38.47,"lng":-77.99,"icon":"circle","label":"","labelOn":false},{"id":"oregon_cxone","name":"Oregon","city":"Portland","state":"Oregon","country":"United States","region":"North America","platform":"CXone Software","type":"appstack","lat":44.0,"lng":-120.5,"icon":"circle","label":"","labelOn":false},{"id":"oregon_cognigy","name":"Oregon","city":"Portland","state":"Oregon","country":"United States","region":"North America","platform":"Cognigy AI","type":"appstack","lat":44.0,"lng":-120.5,"icon":"circle","label":"","labelOn":false},{"id":"la_voicepop","name":"Los Angeles","city":"Los Angeles","state":"California","country":"United States","region":"North America","platform":"Voice POP","type":"voicepop","lat":34.05,"lng":-118.24,"icon":"circle","label":"","labelOn":false},{"id":"la_pstn","name":"Los Angeles","city":"Los Angeles","state":"California","country":"United States","region":"North America","platform":"PSTN Carrier","type":"voicepop","lat":34.05,"lng":-118.24,"icon":"circle","label":"","labelOn":false},{"id":"miami_voicepop","name":"Miami","city":"Miami","state":"Florida","country":"United States","region":"North America","platform":"Voice POP","type":"voicepop","lat":25.77,"lng":-80.19,"icon":"circle","label":"","labelOn":false},{"id":"miami_pstn","name":"Miami","city":"Miami","state":"Florida","country":"United States","region":"North America","platform":"PSTN Carrier","type":"voicepop","lat":25.77,"lng":-80.19,"icon":"circle","label":"","labelOn":false},{"id":"dallas_sov","name":"Dallas","city":"Dallas","state":"Texas","country":"United States","region":"North America","platform":"FedRamp Region","type":"fedramp","lat":32.78,"lng":-96.8,"icon":"circle","label":"","labelOn":false},{"id":"dallas_pstn","name":"Dallas","city":"Dallas","state":"Texas","country":"United States","region":"North America","platform":"PSTN Carrier","type":"fedramp","lat":32.78,"lng":-96.8,"icon":"circle","label":"","labelOn":false},{"id":"toronto_voicepop","name":"Toronto","city":"Toronto","state":"","country":"Canada","region":"North America","platform":"Voice POP","type":"voicepop","lat":43.65,"lng":-79.38,"icon":"circle","label":"","labelOn":false},{"id":"toronto_pstn","name":"Toronto","city":"Toronto","state":"","country":"Canada","region":"North America","platform":"PSTN Carrier","type":"voicepop","lat":43.65,"lng":-79.38,"icon":"circle","label":"","labelOn":false},{"id":"montreal_voicepop","name":"Montreal","city":"Montreal","state":"","country":"Canada","region":"North America","platform":"Voice POP","type":"voicepop","lat":45.5,"lng":-73.57,"icon":"circle","label":"","labelOn":false},{"id":"london_cxone","name":"London","city":"London","state":"","country":"United Kingdom","region":"EMEA","platform":"CXone Software","type":"appstack","lat":51.51,"lng":-0.13,"icon":"circle","label":"","labelOn":false},{"id":"london_cognigy","name":"London","city":"London","state":"","country":"United Kingdom","region":"EMEA","platform":"Cognigy AI","type":"appstack","lat":51.51,"lng":-0.13,"icon":"circle","label":"","labelOn":false},{"id":"london_pstn","name":"London","city":"London","state":"","country":"United Kingdom","region":"EMEA","platform":"PSTN Carrier","type":"appstack","lat":51.51,"lng":-0.13,"icon":"circle","label":"","labelOn":false},{"id":"manchester_cxone","name":"Manchester","city":"Manchester","state":"","country":"United Kingdom","region":"EMEA","platform":"CXone Software","type":"appstack","lat":53.48,"lng":-2.24,"icon":"circle","label":"","labelOn":false},{"id":"manchester_cognigy","name":"Manchester","city":"Manchester","state":"","country":"United Kingdom","region":"EMEA","platform":"Cognigy AI","type":"appstack","lat":53.48,"lng":-2.24,"icon":"circle","label":"","labelOn":false},{"id":"manchester_pstn","name":"Manchester","city":"Manchester","state":"","country":"United Kingdom","region":"EMEA","platform":"PSTN Carrier","type":"appstack","lat":53.48,"lng":-2.24,"icon":"circle","label":"","labelOn":false},{"id":"frankfurt_cxone","name":"Frankfurt","city":"Frankfurt","state":"","country":"Germany","region":"EMEA","platform":"CXone Software","type":"appstack","lat":50.11,"lng":8.68,"icon":"circle","label":"","labelOn":false},{"id":"frankfurt_cognigy","name":"Frankfurt","city":"Frankfurt","state":"","country":"Germany","region":"EMEA","platform":"Cognigy AI","type":"appstack","lat":50.11,"lng":8.68,"icon":"circle","label":"","labelOn":false},{"id":"munich_voicepop","name":"Munich","city":"Munich","state":"","country":"Germany","region":"EMEA","platform":"Voice POP","type":"voicepop","lat":48.14,"lng":11.58,"icon":"circle","label":"","labelOn":false},{"id":"dubai_cxone","name":"Dubai","city":"Dubai","state":"","country":"UAE","region":"MEA","platform":"CXone Software","type":"appstack","lat":25.2,"lng":55.27,"icon":"circle","label":"","labelOn":false},{"id":"dubai_cognigy","name":"Dubai","city":"Dubai","state":"","country":"UAE","region":"MEA","platform":"Cognigy AI","type":"appstack","lat":25.2,"lng":55.27,"icon":"circle","label":"","labelOn":false},{"id":"dubai_pstn","name":"Dubai","city":"Dubai","state":"","country":"UAE","region":"MEA","platform":"PSTN Carrier","type":"appstack","lat":25.2,"lng":55.27,"icon":"circle","label":"","labelOn":false},{"id":"abudhabi_cxone","name":"Abu Dhabi","city":"Abu Dhabi","state":"","country":"UAE","region":"MEA","platform":"CXone Software","type":"appstack","lat":24.47,"lng":54.37,"icon":"circle","label":"","labelOn":false},{"id":"abudhabi_cognigy","name":"Abu Dhabi","city":"Abu Dhabi","state":"","country":"UAE","region":"MEA","platform":"Cognigy AI","type":"appstack","lat":24.47,"lng":54.37,"icon":"circle","label":"","labelOn":false},{"id":"abudhabi_pstn","name":"Abu Dhabi","city":"Abu Dhabi","state":"","country":"UAE","region":"MEA","platform":"PSTN Carrier","type":"appstack","lat":24.47,"lng":54.37,"icon":"circle","label":"","labelOn":false},{"id":"mumbai_voicepop","name":"Mumbai","city":"Mumbai","state":"","country":"India","region":"APAC","platform":"Voice POP","type":"voicepop","lat":19.08,"lng":72.88,"icon":"circle","label":"","labelOn":false},{"id":"mumbai_pstn","name":"Mumbai","city":"Mumbai","state":"","country":"India","region":"APAC","platform":"PSTN Carrier","type":"voicepop","lat":19.08,"lng":72.88,"icon":"circle","label":"","labelOn":false},{"id":"hyderabad_voicepop","name":"Hyderabad","city":"Hyderabad","state":"","country":"India","region":"APAC","platform":"Voice POP","type":"voicepop","lat":17.38,"lng":78.49,"icon":"circle","label":"","labelOn":false},{"id":"hyderabad_pstn","name":"Hyderabad","city":"Hyderabad","state":"","country":"India","region":"APAC","platform":"PSTN Carrier","type":"voicepop","lat":17.38,"lng":78.49,"icon":"circle","label":"","labelOn":false},{"id":"singapore_cxone","name":"Singapore","city":"Singapore","state":"","country":"Singapore","region":"APAC","platform":"CXone Software","type":"appstack","lat":1.35,"lng":103.82,"icon":"circle","label":"","labelOn":false},{"id":"singapore_cognigy","name":"Singapore","city":"Singapore","state":"","country":"Singapore","region":"APAC","platform":"Cognigy AI","type":"appstack","lat":1.35,"lng":103.82,"icon":"circle","label":"","labelOn":false},{"id":"singapore_pstn","name":"Singapore","city":"Singapore","state":"","country":"Singapore","region":"APAC","platform":"PSTN Carrier","type":"appstack","lat":1.35,"lng":103.82,"icon":"circle","label":"","labelOn":false},{"id":"tokyo_cxone","name":"Tokyo","city":"Tokyo","state":"","country":"Japan","region":"APAC","platform":"CXone Software","type":"appstack","lat":35.69,"lng":139.69,"icon":"circle","label":"","labelOn":false},{"id":"tokyo_cognigy","name":"Tokyo","city":"Tokyo","state":"","country":"Japan","region":"APAC","platform":"Cognigy AI","type":"appstack","lat":35.69,"lng":139.69,"icon":"circle","label":"","labelOn":false},{"id":"tokyo_pstn","name":"Tokyo","city":"Tokyo","state":"","country":"Japan","region":"APAC","platform":"PSTN Carrier","type":"appstack","lat":35.69,"lng":139.69,"icon":"circle","label":"","labelOn":false},{"id":"osaka_cxone","name":"Osaka","city":"Osaka","state":"","country":"Japan","region":"APAC","platform":"CXone Software","type":"appstack","lat":34.69,"lng":135.5,"icon":"circle","label":"","labelOn":false},{"id":"osaka_cognigy","name":"Osaka","city":"Osaka","state":"","country":"Japan","region":"APAC","platform":"Cognigy AI","type":"appstack","lat":34.69,"lng":135.5,"icon":"circle","label":"","labelOn":false},{"id":"osaka_pstn","name":"Osaka","city":"Osaka","state":"","country":"Japan","region":"APAC","platform":"PSTN Carrier","type":"appstack","lat":34.69,"lng":135.5,"icon":"circle","label":"","labelOn":false},{"id":"seoul_voicepop","name":"Seoul","city":"Seoul","state":"","country":"South Korea","region":"APAC","platform":"Voice POP","type":"voicepop","lat":37.57,"lng":126.98,"icon":"circle","label":"","labelOn":false},{"id":"seoul_pstn","name":"Seoul","city":"Seoul","state":"","country":"South Korea","region":"APAC","platform":"PSTN Carrier","type":"voicepop","lat":37.57,"lng":126.98,"icon":"circle","label":"","labelOn":false},{"id":"sydney_cxone","name":"Sydney","city":"Sydney","state":"","country":"Australia","region":"APAC","platform":"CXone Software","type":"appstack","lat":-33.87,"lng":151.21,"icon":"circle","label":"","labelOn":false},{"id":"sydney_cognigy","name":"Sydney","city":"Sydney","state":"","country":"Australia","region":"APAC","platform":"Cognigy AI","type":"appstack","lat":-33.87,"lng":151.21,"icon":"circle","label":"","labelOn":false},{"id":"sydney_pstn","name":"Sydney","city":"Sydney","state":"","country":"Australia","region":"APAC","platform":"PSTN Carrier","type":"appstack","lat":-33.87,"lng":151.21,"icon":"circle","label":"","labelOn":false},{"id":"melbourne_voicepop","name":"Melbourne","city":"Melbourne","state":"","country":"Australia","region":"APAC","platform":"Voice POP","type":"voicepop","lat":-37.81,"lng":144.96,"icon":"circle","label":"","labelOn":false},{"id":"saopaulo_sov","name":"Sao Paulo","city":"Sao Paulo","state":"","country":"Brazil","region":"LATAM","platform":"SOV Region","type":"sovregion","lat":-23.55,"lng":-46.63,"icon":"circle","label":"","labelOn":false},{"id":"saopaulo_voicepop","name":"Sao Paulo","city":"Sao Paulo","state":"","country":"Brazil","region":"LATAM","platform":"Voice POP","type":"sovvoice","lat":-23.55,"lng":-46.63,"icon":"circle","label":"","labelOn":false},{"id":"saopaulo_pstn","name":"Sao Paulo","city":"Sao Paulo","state":"","country":"Brazil","region":"LATAM","platform":"PSTN Carrier","type":"sovregion","lat":-23.55,"lng":-46.63,"icon":"circle","label":"","labelOn":false},{"id":"rio_sov","name":"Rio de Janeiro","city":"Rio de Janeiro","state":"","country":"Brazil","region":"LATAM","platform":"SOV Region","type":"sovregion","lat":-22.91,"lng":-43.17,"icon":"circle","label":"","labelOn":false},{"id":"rio_voicepop","name":"Rio de Janeiro","city":"Rio de Janeiro","state":"","country":"Brazil","region":"LATAM","platform":"Voice POP","type":"sovvoice","lat":-22.91,"lng":-43.17,"icon":"circle","label":"","labelOn":false},{"id":"capetown_sov","name":"Cape Town","city":"Cape Town","state":"","country":"South Africa","region":"MEA","platform":"SOV Region","type":"sovregion","lat":-33.93,"lng":18.42,"icon":"circle","label":"","labelOn":false},{"id":"capetown_voicepop","name":"Cape Town","city":"Cape Town","state":"","country":"South Africa","region":"MEA","platform":"Voice POP","type":"sovvoice","lat":-33.93,"lng":18.42,"icon":"circle","label":"","labelOn":false},{"id":"capetown_pstn","name":"Cape Town","city":"Cape Town","state":"","country":"South Africa","region":"MEA","platform":"PSTN Carrier","type":"sovregion","lat":-33.93,"lng":18.42,"icon":"circle","label":"","labelOn":false},{"id":"johannesburg_sov","name":"Johannesburg","city":"Johannesburg","state":"","country":"South Africa","region":"MEA","platform":"SOV Region","type":"sovregion","lat":-26.2,"lng":28.04,"icon":"circle","label":"","labelOn":false},{"id":"johannesburg_voicepop","name":"Johannesburg","city":"Johannesburg","state":"","country":"South Africa","region":"MEA","platform":"Voice POP","type":"sovvoice","lat":-26.2,"lng":28.04,"icon":"circle","label":"","labelOn":false},{"id":"johannesburg_pstn","name":"Johannesburg","city":"Johannesburg","state":"","country":"South Africa","region":"MEA","platform":"PSTN Carrier","type":"sovregion","lat":-26.2,"lng":28.04,"icon":"circle","label":"","labelOn":false}];
 const DEFAULT_PLATFORMS = [
   {"id":"p_cxone",  "name":"CXone Software"},
   {"id":"p_cog",    "name":"Cognigy AI"},
@@ -479,9 +422,12 @@ const DEFAULT_PLATFORMS = [
   {"id":"p_sov",    "name":"SOV Region"}
 ];
 const DEFAULT_TYPE_CFG = {
-  cxone: { color:'#2B8EFF', label:'CXone Software + Cognigy AI' },
-  voice: { color:'#8B5CF6', label:'Voice POP' },
-  sov:   { color:'#F59E0B', label:'SOV Region + Voice POP' },
+  appstack:     { color: '#2B8EFF', label: 'Application Stack' },
+  voicepop:     { color: '#8B5CF6', label: 'Voice POP' },
+  sovregion:    { color: '#F59E0B', label: 'SOV Region' },
+  fedramp:      { color: '#22c55e', label: 'FedRamp' },
+  sovvoice:     { color: '#f97316', label: 'SOV Voice' },
+  fedrampvoice: { color: '#e879f9', label: 'FedRamp Voice' },
 };
 const US_STATES = [
   'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
@@ -990,12 +936,40 @@ function renderTable(){
       <td><div class="row-actions">
         <button class="act-btn fly"  title="Fly to" onclick="flyTo('${loc.id}')">🎯</button>
         <button class="act-btn edit" title="Edit"   onclick="openModal('${loc.id}')">✏️</button>
+        <button class="act-btn" title="Clone location" onclick="cloneLocation('${loc.id}')">📋</button>
         <button class="act-btn del"  title="Remove" onclick="removeLoc('${loc.id}')">🗑</button>
       </div></td>`;
     tbody.appendChild(tr);
   });
 }
 function flyTo(id){ const loc=locations.find(l=>l.id===id);if(!loc) return;map.flyTo([loc.lat,loc.lng],Math.max(map.getZoom(),5),{duration:1.2});setTimeout(()=>markerMap[id]?.openPopup(),1400) }
+
+function cloneLocation(id) {
+  const src = locations.find(l => l.id === id);
+  if (!src) return;
+  openModal(null);
+  document.getElementById('m-name').value    = 'Copy of ' + src.name;
+  document.getElementById('m-city').value    = src.city    || '';
+  document.getElementById('m-country').value = src.country || '';
+  document.getElementById('m-region').value  = src.region  || '';
+  document.getElementById('m-lat').value     = src.lat     || '';
+  document.getElementById('m-lng').value     = src.lng     || '';
+  document.getElementById('m-label').value   = src.label   || '';
+  document.getElementById('m-label-on').checked = src.labelOn || false;
+  const mPlat = document.getElementById('m-plat');
+  if (mPlat) mPlat.value = src.platform || '';
+  buildTypeSelect(src.type || 'appstack');
+  selIcon(src.icon || 'circle');
+  checkUSState();
+  if (src.state) {
+    setTimeout(() => { document.getElementById('m-state').value = src.state; }, 50);
+  }
+  const st = document.getElementById('geo-st');
+  if (src.lat && src.lng) {
+    st.textContent = `📍 ${src.lat}, ${src.lng} — cloned from ${src.name}`;
+    st.className = 'geo-st ok';
+  }
+}
 
 // ── Location modal ─────────────────────────────────────────────────────────────
 const US_VARIANTS=['usa','us','united states','united states of america'];
@@ -1034,7 +1008,7 @@ function openModal(id){
   const mPlat=document.getElementById('m-plat');
   mPlat.innerHTML='<option value="">— Select platform —</option>'+platforms.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
   mPlat.value=loc?.platform||'';
-  buildTypeSelect(loc?.type||'cxone');
+  buildTypeSelect(loc?.type||'appstack');
   selIcon(loc?.icon||'circle');
   document.getElementById('m-label').value   = loc?.label   || '';
   document.getElementById('m-label-on').checked = loc?.labelOn || false;
@@ -1364,6 +1338,19 @@ function resetToDefaults(){
 }
 
 function dlJSON(filename,data){ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000) }
+
+function exportTypeFiles() {
+  const typeKeys = Object.keys(typeConfig);
+  let delay = 0;
+  typeKeys.forEach(typeKey => {
+    const entries = locations.filter(l => l.type === typeKey);
+    setTimeout(() => {
+      dlJSON(typeKey + '.json', entries);
+    }, delay);
+    delay += 300;
+  });
+  showToast(`Exporting ${typeKeys.length} data files — check your downloads folder.`);
+}
 
 // ── Persist to localStorage ────────────────────────────────────────────────────
 function persist(){

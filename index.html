@@ -76,6 +76,8 @@
       <div class="dd-item" onclick="importSettings();closeDD('dd-settings')"><span class="dd-check"></span>📂 Import</div>
       <div class="dd-sep"></div>
       <div class="dd-item" onclick="exportSourceFile();closeDD('dd-settings')"><span class="dd-check"></span>📦 Export Source File</div>
+      <div class="dd-sep"></div>
+      <div class="dd-item" onclick="exportTypeFiles();closeDD('dd-settings')"><span class="dd-check"></span>📂 Export Data Files</div>
     </div>
   </div>
   <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)">
