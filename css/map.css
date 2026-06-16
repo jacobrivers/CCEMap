@@ -383,10 +383,10 @@ body.dark  .leaflet-control-zoom a { background: #1a1d2e; color: #eef; border-co
 }
 .dd-btn:hover { border-color: var(--muted); }
 .dd-menu {
-  position: absolute; top: 100%; left: 0; min-width: 160px;
+  position: fixed; min-width: 160px;
   background: var(--panel); border: 1px solid var(--border);
-  border-radius: 6px; box-shadow: 0 4px 12px rgba(0,0,0,.35);
-  z-index: 2000; display: none; padding: 4px 0; margin-top: 2px;
+  border-radius: 6px; box-shadow: 0 8px 24px rgba(0,0,0,.45);
+  z-index: 99999; display: none; padding: 4px 0;
 }
 .dd-wrap.open .dd-menu { display: block; }
 .dd-item {

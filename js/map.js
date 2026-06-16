@@ -460,9 +460,22 @@ let openDdId = null;
 function toggleDD(id, e) {
   e && e.stopPropagation();
   if (openDdId && openDdId !== id) closeDD(openDdId);
-  const el = document.getElementById(id);
-  el.classList.toggle('open');
-  openDdId = el.classList.contains('open') ? id : null;
+  const wrap = document.getElementById(id);
+  const isOpen = wrap.classList.contains('open');
+  if (isOpen) { closeDD(id); return; }
+  // Position using fixed coords — clears Leaflet's stacking context entirely
+  const btn  = wrap.querySelector('.dd-btn');
+  const rect = btn.getBoundingClientRect();
+  const menu = wrap.querySelector('.dd-menu');
+  menu.style.top  = (rect.bottom + 4) + 'px';
+  menu.style.left = rect.left + 'px';
+  wrap.classList.add('open');
+  // Nudge left if menu overflows viewport right edge
+  requestAnimationFrame(() => {
+    const mr = menu.getBoundingClientRect();
+    if (mr.right > window.innerWidth - 8) menu.style.left = (rect.right - mr.width) + 'px';
+  });
+  openDdId = id;
 }
 function closeDD(id) {
   const el = document.getElementById(id);
