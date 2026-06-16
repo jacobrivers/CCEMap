@@ -347,6 +347,18 @@ td.dim { color: var(--muted); max-width: 85px; white-space: nowrap; overflow: hi
 body.light .leaflet-control-zoom a { background: #fff; color: #333; border-color: #ccc; }
 body.dark  .leaflet-control-zoom a { background: #1a1d2e; color: #eef; border-color: #2e3150; }
 
+/* ── Pin labels ──────────────────────────────────────────────────────────── */
+.map-label { background: var(--panel) !important; border: 1px solid var(--border) !important; border-radius: 5px !important; color: var(--text) !important; font-size: 10.5px !important; font-weight: 600 !important; padding: 2px 7px !important; white-space: nowrap !important; box-shadow: 0 2px 8px rgba(0,0,0,.28) !important; pointer-events: none !important; transition: none !important; }
+.map-label.leaflet-tooltip-bottom::before { border-bottom-color: var(--border) !important; }
+.map-label.leaflet-tooltip-top::before    { border-top-color:    var(--border) !important; }
+.map-label.leaflet-tooltip-left::before   { border-left-color:   var(--border) !important; }
+.map-label.leaflet-tooltip-right::before  { border-right-color:  var(--border) !important; }
+.label-row { display: flex; gap: 8px; align-items: center; }
+.label-row input[type=text] { flex: 1; }
+.label-toggle { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--text); white-space: nowrap; cursor: pointer; padding: 4px 8px; border: 1.5px solid var(--border); border-radius: 6px; background: var(--badge); }
+.label-toggle:has(input:checked) { border-color: var(--nice-pink); color: var(--nice-pink); background: rgba(232,23,93,.08); }
+.label-toggle input { accent-color: var(--nice-pink); }
+
 /* ── Marker type editor ──────────────────────────────────────────────────── */
 .mt-row {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;

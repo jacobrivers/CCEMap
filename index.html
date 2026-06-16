@@ -57,7 +57,8 @@
   <button class="ctrl-btn" id="theme-btn"  onclick="toggleTheme()">🌙 Dark</button>
   <button class="ctrl-btn" id="labels-btn" onclick="toggleLabels()">🏷️ Labels</button>
   <button class="ctrl-btn" id="list-btn"   onclick="togglePanel()">📋 List</button>
-  <button class="ctrl-btn" id="undo-btn"   onclick="undoDelete()" style="display:none">↩️ Undo</button>
+  <button class="ctrl-btn" id="undo-btn"      onclick="undoDelete()" style="display:none">↩️ Undo</button>
+  <button class="ctrl-btn" id="pinlabels-btn" onclick="togglePinLabels()">📍 Pin Labels</button>
   <button class="ctrl-btn" onclick="openPlatformMgr()">⚙️ Platforms</button>
   <button class="ctrl-btn" onclick="openMT()">🎨 Marker Types</button>
   <button class="ctrl-btn" onclick="reloadFromSource()" title="Reload data from source files">🔄 Sync</button>
@@ -128,6 +129,13 @@
     <div class="fg"><label>Platforms / Services</label><div class="plat-grid" id="m-plat-grid"></div></div>
     <div class="fg"><label>Marker Colour</label>
       <select id="m-type"></select>
+    </div>
+    <div class="fg">
+      <label>Pin Label</label>
+      <div class="label-row">
+        <input type="text" id="m-label" placeholder="Defaults to display name"/>
+        <label class="label-toggle"><input type="checkbox" id="m-label-on"> Show on map</label>
+      </div>
     </div>
     <div class="fg"><label>Pin Icon</label>
       <div class="icon-picker-row" id="m-icon-picker">

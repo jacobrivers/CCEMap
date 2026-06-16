@@ -37,7 +37,7 @@ const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ';
 let locations = [], platforms = [], typeConfig = {};
 let markerMap = {}, layerOn = { cxone:true, voice:true, sov:true };
 let platformFilter = new Set(), pfTemp = new Set();
-let isDark = true, labelsOn = true, panelOpen = false;
+let isDark = true, labelsOn = true, pinLabelsOn = true, panelOpen = false;
 let editingId = null, selIconVal = 'circle';
 let sortKey = 'name', sortDir = 1;
 let undoStack = [], toastTimer = null;
@@ -45,6 +45,7 @@ let map, baseLayer, refLayer, legendEl = null;
 let cfg = {};
 let srcLocs = null, srcPlats = null;
 let pmWorking = [], mtWorking = {};
+let placedLabelRects = [], labelResTimer = null;
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 function tryParseArr(s) { try { const d=JSON.parse(s); return Array.isArray(d)&&d.length?d:null; } catch { return null; } }
@@ -69,10 +70,12 @@ async function boot() {
 
   // Restore typeConfig from localStorage, then theme/labels
   typeConfig = tryParseObj(localStorage.getItem('nice_typecfg')) || clone(DEFAULT_TYPE_CFG);
-  const storedTheme  = localStorage.getItem('nice_theme');
-  const storedLabels = localStorage.getItem('nice_labels');
-  isDark   = storedTheme  ? storedTheme==='dark'     : (cfg.defaultTheme||'dark')==='dark';
-  labelsOn = storedLabels ? JSON.parse(storedLabels) : cfg.defaultLabels !== false;
+  const storedTheme     = localStorage.getItem('nice_theme');
+  const storedLabels    = localStorage.getItem('nice_labels');
+  const storedPinLabels = localStorage.getItem('nice_pinlabels');
+  isDark      = storedTheme     ? storedTheme==='dark'        : (cfg.defaultTheme||'dark')==='dark';
+  labelsOn    = storedLabels    ? JSON.parse(storedLabels)    : cfg.defaultLabels !== false;
+  pinLabelsOn = storedPinLabels ? JSON.parse(storedPinLabels) : true;
 
   document.body.className = isDark ? 'dark' : 'light';
 
@@ -146,6 +149,10 @@ function initMap() {
   document.getElementById('theme-btn').textContent  = isDark   ? '🌙 Dark' : '☀️ Light';
   document.getElementById('labels-btn').textContent = labelsOn ? '🏷️ Labels' : '🏷️ No Labels';
   if (!labelsOn) document.getElementById('labels-btn').classList.add('active');
+  document.getElementById('pinlabels-btn').classList.toggle('active', !pinLabelsOn);
+  document.getElementById('pinlabels-btn').textContent = pinLabelsOn ? '📍 Pin Labels' : '📍 Labels Off';
+
+  map.on('zoomend moveend', scheduleResolveOverlaps);
 
   renderAll();
   refreshLayerButtons();
@@ -272,6 +279,7 @@ function applyAllVisibility() {
     const m = markerMap[loc.id]; if (!m) return;
     if (isVisible(loc)) map.addLayer(m); else map.removeLayer(m);
   });
+  scheduleResolveOverlaps();
 }
 
 // ─── Markers ──────────────────────────────────────────────────────────────────
@@ -280,6 +288,7 @@ function addMarker(loc) {
   m.bindPopup(popupHTML(loc), { maxWidth:320 }); m.addTo(map);
   if (!isVisible(loc)) map.removeLayer(m);
   markerMap[loc.id] = m;
+  if (loc.labelOn && pinLabelsOn && isVisible(loc)) attachPinLabel(loc, m);
 }
 function removeLoc(id) {
   map.closePopup();
@@ -293,6 +302,7 @@ function removeLoc(id) {
 function renderAll() {
   Object.values(markerMap).forEach(m => map.removeLayer(m)); markerMap = {};
   locations.forEach(addMarker); updateCounts(); renderTable(); syncGpinBtn();
+  scheduleResolveOverlaps();
 }
 function updateCounts() {
   const c = { cxone:0, voice:0, sov:0 };
@@ -481,6 +491,8 @@ function openModal(id) {
   document.getElementById('m-region').value  = loc?.region  || '';
   document.getElementById('m-lat').value     = loc?.lat     || '';
   document.getElementById('m-lng').value     = loc?.lng     || '';
+  document.getElementById('m-label').value      = loc?.label   || '';
+  document.getElementById('m-label-on').checked = loc?.labelOn || false;
   buildModalPlatGrid(loc?.platforms||[]);
   buildTypeSelect(loc?.type||'cxone');
   selIcon(loc?.icon||'circle');
@@ -531,6 +543,8 @@ function saveModal() {
     country, region:document.getElementById('m-region').value,
     type:document.getElementById('m-type').value,
     platforms:getSelectedPlats(), icon:selIconVal, lat, lng,
+    label:   document.getElementById('m-label').value.trim(),
+    labelOn: document.getElementById('m-label-on').checked,
   };
   if (editingId) {
     const idx = locations.findIndex(l=>l.id===editingId);
@@ -538,6 +552,7 @@ function saveModal() {
       locations[idx] = {...locations[idx],...data};
       const loc=locations[idx], m=markerMap[editingId];
       if (m) { m.setLatLng([loc.lat,loc.lng]); m.setIcon(buildIcon(loc.type,loc.icon)); m.setPopupContent(popupHTML(loc)); if(!isVisible(loc)) map.removeLayer(m); else map.addLayer(m); }
+      refreshAllPinLabels();
     }
   } else {
     const loc = {id:'c_'+Date.now(),...data}; locations.push(loc); addMarker(loc);
@@ -596,15 +611,92 @@ function saveMT() {
   showToast('Marker types updated ✓');
 }
 
+// ─── Pin Labels ───────────────────────────────────────────────────────────────
+function attachPinLabel(loc, m) {
+  const text = loc.label || loc.name;
+  m.bindTooltip(text, { permanent:true, direction:'bottom', className:'map-label', interactive:false });
+}
+
+function togglePinLabels() {
+  pinLabelsOn = !pinLabelsOn;
+  const btn = document.getElementById('pinlabels-btn');
+  btn.classList.toggle('active', !pinLabelsOn);
+  btn.textContent = pinLabelsOn ? '📍 Pin Labels' : '📍 Labels Off';
+  refreshAllPinLabels(); persist();
+}
+
+function refreshAllPinLabels() {
+  locations.forEach(loc => {
+    const m = markerMap[loc.id]; if (!m) return;
+    m.unbindTooltip();
+    if (loc.labelOn && pinLabelsOn && isVisible(loc) && map.hasLayer(m))
+      attachPinLabel(loc, m);
+  });
+  scheduleResolveOverlaps();
+}
+
+function scheduleResolveOverlaps() {
+  clearTimeout(labelResTimer);
+  labelResTimer = setTimeout(resolveLabelOverlaps, 160);
+}
+
+function estimateLabelRect(px, dir, text) {
+  const w = Math.max(48, text.length * 6.5) + 14, h = 20, GAP = 15;
+  let x, y;
+  switch(dir) {
+    case 'bottom': x=px.x-w/2; y=px.y+GAP; break;
+    case 'top':    x=px.x-w/2; y=px.y-GAP-h; break;
+    case 'right':  x=px.x+GAP; y=px.y-h/2; break;
+    case 'left':   x=px.x-GAP-w; y=px.y-h/2; break;
+    default:       x=px.x-w/2; y=px.y+GAP;
+  }
+  return {x, y, w, h};
+}
+
+function rectsOverlapPx(a, b, pad=3) {
+  return !(a.x+a.w+pad < b.x || b.x+b.w+pad < a.x || a.y+a.h+pad < b.y || b.y+b.h+pad < a.y);
+}
+
+function resolveLabelOverlaps() {
+  if (!map) return;
+  placedLabelRects = [];
+  const DIRS = ['bottom','top','right','left'];
+  const toPlace = locations
+    .filter(loc => loc.labelOn && pinLabelsOn && isVisible(loc) && markerMap[loc.id] && map.hasLayer(markerMap[loc.id]))
+    .map(loc => ({ loc, m: markerMap[loc.id], px: map.latLngToContainerPoint([loc.lat, loc.lng]) }));
+
+  const pinRects = toPlace.map(({px}) => ({x:px.x-13, y:px.y-13, w:26, h:26}));
+
+  toPlace.forEach(({loc, m, px}, idx) => {
+    const text = loc.label || loc.name;
+    let bestDir = 'bottom', minScore = Infinity;
+    for (const dir of DIRS) {
+      const rect = estimateLabelRect(px, dir, text);
+      let score = 0;
+      for (const pr of placedLabelRects)    { if (rectsOverlapPx(rect, pr))            score += 10; }
+      for (let i=0; i<pinRects.length; i++) { if (i!==idx && rectsOverlapPx(rect, pinRects[i], 2)) score += 3; }
+      if (score < minScore) { minScore = score; bestDir = dir; }
+      if (score === 0) break;
+    }
+    placedLabelRects.push(estimateLabelRect(px, bestDir, text));
+    const tt = m.getTooltip();
+    if (!tt || tt.options.direction !== bestDir) {
+      m.unbindTooltip();
+      m.bindTooltip(text, { permanent:true, direction:bestDir, className:'map-label', interactive:false });
+    }
+  });
+}
+
 // ─── Export / Import / Reload ─────────────────────────────────────────────────
 function exportSettings() {
   dlJSON('nice-cxone-map-settings.json', {
-    _version: 2,
+    _version: 3,
     _exported: new Date().toISOString(),
     _note: 'NiCE CXone Map — full settings. Edit and Import to apply changes.',
     locations, platforms, typeConfig,
     theme: isDark ? 'dark' : 'light',
     labels: labelsOn,
+    pinLabels: pinLabelsOn,
   });
 }
 
@@ -621,6 +713,7 @@ function handleImportFile(e) {
       if(d.typeConfig) typeConfig=d.typeConfig;
       if(d.theme!==undefined){ isDark=d.theme==='dark'; document.body.className=isDark?'dark':'light'; document.getElementById('theme-btn').textContent=isDark?'🌙 Dark':'☀️ Light'; }
       if(d.labels!==undefined){ labelsOn=d.labels; document.getElementById('labels-btn').textContent=labelsOn?'🏷️ Labels':'🏷️ No Labels'; document.getElementById('labels-btn').classList.toggle('active',!labelsOn); }
+      if(d.pinLabels!==undefined){ pinLabelsOn=d.pinLabels; const pb=document.getElementById('pinlabels-btn'); pb.classList.toggle('active',!pinLabelsOn); pb.textContent=pinLabelsOn?'📍 Pin Labels':'📍 Labels Off'; }
       persist(); renderAll(); refreshLayerButtons(); refreshLegend(); applyTiles();
       showToast('Settings imported ✓');
     } catch(err){ alert('Import failed: '+err.message); }
@@ -646,11 +739,12 @@ function dlJSON(filename, data) {
 // ─── Persist to localStorage ──────────────────────────────────────────────────
 function persist() {
   try {
-    localStorage.setItem('nice_locs',    JSON.stringify(locations));
-    localStorage.setItem('nice_plats',   JSON.stringify(platforms));
-    localStorage.setItem('nice_typecfg', JSON.stringify(typeConfig));
-    localStorage.setItem('nice_theme',   isDark?'dark':'light');
-    localStorage.setItem('nice_labels',  JSON.stringify(labelsOn));
+    localStorage.setItem('nice_locs',       JSON.stringify(locations));
+    localStorage.setItem('nice_plats',      JSON.stringify(platforms));
+    localStorage.setItem('nice_typecfg',    JSON.stringify(typeConfig));
+    localStorage.setItem('nice_theme',      isDark?'dark':'light');
+    localStorage.setItem('nice_labels',     JSON.stringify(labelsOn));
+    localStorage.setItem('nice_pinlabels',  JSON.stringify(pinLabelsOn));
   } catch {}
 }
 
@@ -660,6 +754,10 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pm-overlay').addEventListener('click', e=>{if(e.target===document.getElementById('pm-overlay')) closePM()});
   document.getElementById('pf-overlay').addEventListener('click', e=>{if(e.target===document.getElementById('pf-overlay')) closePFModal()});
   document.getElementById('mt-overlay').addEventListener('click', e=>{if(e.target===document.getElementById('mt-overlay')) closeMT()});
+  document.getElementById('m-name').addEventListener('input', ()=>{
+    const lbl=document.getElementById('m-label');
+    if(!lbl.value) lbl.placeholder=document.getElementById('m-name').value||'Defaults to display name';
+  });
   document.getElementById('m-name')    .addEventListener('keydown', e=>{if(e.key==='Enter') geocode()});
   document.getElementById('pm-new-name').addEventListener('keydown', e=>{if(e.key==='Enter') addPlatform()});
   document.getElementById('sp-search') .addEventListener('input', renderTable);
