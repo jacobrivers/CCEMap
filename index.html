@@ -21,10 +21,8 @@
   <div class="logo">N<span class="p">i</span>CE &nbsp;<span style="font-weight:400">CX</span><span class="p">one</span></div>
   <h1>Global AI CX Reach &amp; Coverage</h1>
   <div class="stats">
-    <div class="pill"><strong>10</strong> Regions</div>
-    <div class="pill"><strong>28</strong> Inbound Carriers</div>
-    <div class="pill"><strong>27</strong> Outbound Carriers</div>
-    <div class="pill"><strong>33</strong> Voice POPs</div>
+    <div class="pill"><strong id="stat-regions">—</strong> Regions</div>
+    <div class="pill"><strong id="stat-voicepops">—</strong> Voice POPs</div>
     <div class="pill"><strong id="stat-total">—</strong> Locations</div>
     <span id="source-badge" class="source-badge">—</span>
   </div>
@@ -142,7 +140,8 @@
     <div class="frow">
       <div class="fg"><label>Country</label><input type="text" id="m-country" placeholder="e.g. United Kingdom" oninput="checkUSState()"/></div>
       <div class="fg"><label>Region</label>
-        <select id="m-region"><option value="">— Select —</option><option>North America</option><option>EMEA</option><option>APAC</option><option>LATAM</option><option>MEA</option></select>
+        <select id="m-region" onchange="onRegionChange()"></select>
+        <input type="text" id="m-region-new" placeholder="New region name…" style="display:none;margin-top:4px;width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--badge);color:var(--fg);font-size:12px"/>
       </div>
     </div>
     <div class="fg" id="state-row" style="display:none">

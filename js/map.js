@@ -315,6 +315,7 @@ function applyAllVisibility() {
     const m = markerMap[loc.id]; if (!m) return;
     if (isVisible(loc)) map.addLayer(m); else map.removeLayer(m);
   });
+  updateCounts();
   scheduleResolveOverlaps();
 }
 
@@ -357,13 +358,24 @@ function renderAll() {
   scheduleResolveOverlaps();
 }
 function updateCounts() {
+  const vis = locations.filter(isVisible);
+  // Layer button counts (totals, not filtered)
   const c = {};
   Object.keys(typeConfig).forEach(k => c[k] = 0);
-  locations.forEach(l => { if (c[l.type] !== undefined) c[l.type]++; else c[l.type] = (c[l.type] || 0) + 1; });
-  Object.keys(c).forEach(k => { const el = document.getElementById('cnt-' + k); if (el) el.textContent = c[k]; });
-  document.getElementById('cnt-all').textContent   = locations.length;
-  document.getElementById('stat-total').textContent = locations.length;
-  document.getElementById('sp-count').textContent  = locations.length + ' total';
+  locations.forEach(l => { if (c[l.type] !== undefined) c[l.type]++; else c[l.type] = (c[l.type]||0)+1; });
+  Object.keys(c).forEach(k => { const el = document.getElementById('cnt-'+k); if (el) el.textContent = c[k]; });
+  document.getElementById('cnt-all').textContent = locations.length;
+  // Header stats — dynamic based on visible pins
+  const total = document.getElementById('stat-total');
+  if (total) total.textContent = vis.length;
+  const regEl = document.getElementById('stat-regions');
+  if (regEl) regEl.textContent = new Set(vis.map(l=>l.region).filter(Boolean)).size;
+  const vpEl = document.getElementById('stat-voicepops');
+  const vpTypes = ['voicepop','sovvoice','fedrampvoice'];
+  if (vpEl) vpEl.textContent = vis.filter(l=>vpTypes.includes(l.type)).length;
+  // Side panel count
+  const spCount = document.getElementById('sp-count');
+  if (spCount) spCount.textContent = vis.length + ' total';
 }
 
 // ─── Layer toggle ─────────────────────────────────────────────────────────────
@@ -618,7 +630,7 @@ function cloneLocation(id) {
   document.getElementById('m-name').value    = 'Copy of ' + src.name;
   document.getElementById('m-city').value    = src.city    || '';
   document.getElementById('m-country').value = src.country || '';
-  document.getElementById('m-region').value  = src.region  || '';
+  buildRegionSelect(src.region || '');
   document.getElementById('m-lat').value     = src.lat     || '';
   document.getElementById('m-lng').value     = src.lng     || '';
   document.getElementById('m-label').value   = src.label   || '';
@@ -636,6 +648,27 @@ function cloneLocation(id) {
     st.textContent = `📍 ${src.lat}, ${src.lng} — cloned from ${src.name}`;
     st.className = 'geo-st ok';
   }
+}
+
+// ─── Region select ────────────────────────────────────────────────────────────
+const DEFAULT_REGIONS = ['North America','EMEA','APAC','LATAM','MEA'];
+function buildRegionSelect(current) {
+  const sel = document.getElementById('m-region');
+  if (!sel) return;
+  const dataRegions = locations.map(l=>l.region).filter(Boolean);
+  const all = [...new Set([...DEFAULT_REGIONS, ...dataRegions])].sort();
+  sel.innerHTML = '<option value="">— Select —</option>' +
+    all.map(r=>`<option value="${r}"${r===current?' selected':''}>${r}</option>`).join('') +
+    '<option value="__new__">＋ Add new region…</option>';
+  const ni = document.getElementById('m-region-new');
+  if (ni) { ni.style.display='none'; ni.value=''; }
+}
+function onRegionChange() {
+  const sel = document.getElementById('m-region');
+  const ni  = document.getElementById('m-region-new');
+  if (!sel||!ni) return;
+  if (sel.value==='__new__') { ni.style.display='block'; ni.focus(); }
+  else ni.style.display='none';
 }
 
 // ─── Location modal ───────────────────────────────────────────────────────────
@@ -669,7 +702,7 @@ function openModal(id) {
   document.getElementById('m-name').value    = loc?.name    || '';
   document.getElementById('m-city').value    = loc?.city    || '';
   document.getElementById('m-country').value = loc?.country || '';
-  document.getElementById('m-region').value  = loc?.region  || '';
+  buildRegionSelect(loc?.region || '');
   document.getElementById('m-lat').value     = loc?.lat     || '';
   document.getElementById('m-lng').value     = loc?.lng     || '';
   document.getElementById('m-label').value      = loc?.label   || '';
@@ -801,7 +834,7 @@ function saveModal() {
   const data = {
     name, city:document.getElementById('m-city').value.trim(),
     state: isUSA(country) ? document.getElementById('m-state').value : '',
-    country, region:document.getElementById('m-region').value,
+    country, region:(()=>{ const s=document.getElementById('m-region'); const ni=document.getElementById('m-region-new'); return s.value==='__new__' ? (ni?.value.trim()||'') : s.value; })(),
     type:document.getElementById('m-type').value,
     platform:document.getElementById('m-plat').value, icon:selIconVal, lat, lng,
     label:   document.getElementById('m-label').value.trim(),
