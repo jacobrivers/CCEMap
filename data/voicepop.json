@@ -17,21 +17,6 @@
     "address": "MTL7 1155 Boulevard Robert-Bourassa, Montréal, QC H3B 3A7, Canada"
   },
   {
-    "id": "toronto_pstn",
-    "name": "Toronto",
-    "city": "Toronto",
-    "state": "",
-    "country": "Canada",
-    "region": "North America",
-    "platform": "PSTN Carrier",
-    "type": "voicepop",
-    "lat": 43.65,
-    "lng": -79.38,
-    "icon": "circle",
-    "label": "",
-    "labelOn": false
-  },
-  {
     "id": "toronto_voicepop",
     "name": "Toronto",
     "city": "Toronto",
@@ -66,21 +51,6 @@
     "labelOn": false
   },
   {
-    "id": "la_pstn",
-    "name": "Los Angeles",
-    "city": "Los Angeles",
-    "state": "California",
-    "country": "United States",
-    "region": "North America",
-    "platform": "PSTN Carrier",
-    "type": "voicepop",
-    "lat": 34.05,
-    "lng": -118.24,
-    "icon": "circle",
-    "label": "",
-    "labelOn": false
-  },
-  {
     "id": "la_voicepop",
     "name": "Los Angeles",
     "city": "Los Angeles",
@@ -96,21 +66,6 @@
     "labelOn": false,
     "provider": "Coresite",
     "address": "900 N. Alameda, Los Angeles, CA 90017"
-  },
-  {
-    "id": "miami_pstn",
-    "name": "Miami",
-    "city": "Miami",
-    "state": "Florida",
-    "country": "United States",
-    "region": "North America",
-    "platform": "PSTN Carrier",
-    "type": "voicepop",
-    "lat": 25.77,
-    "lng": -80.19,
-    "icon": "circle",
-    "label": "",
-    "labelOn": false
   },
   {
     "id": "miami_voicepop",
@@ -230,21 +185,6 @@
     "labelOn": false
   },
   {
-    "id": "hyderabad_pstn",
-    "name": "Hyderabad",
-    "city": "Hyderabad",
-    "state": "",
-    "country": "India",
-    "region": "APAC",
-    "platform": "PSTN Carrier",
-    "type": "voicepop",
-    "lat": 17.38,
-    "lng": 78.49,
-    "icon": "circle",
-    "label": "",
-    "labelOn": false
-  },
-  {
     "id": "hyderabad_voicepop",
     "name": "Hyderabad",
     "city": "Hyderabad",
@@ -260,21 +200,6 @@
     "labelOn": false,
     "provider": "STT",
     "address": "VSB, CFC-1 Software Units Layout - Hitech city-Madhapur - Hyderabad 500081"
-  },
-  {
-    "id": "mumbai_pstn",
-    "name": "Mumbai",
-    "city": "Mumbai",
-    "state": "",
-    "country": "India",
-    "region": "APAC",
-    "platform": "PSTN Carrier",
-    "type": "voicepop",
-    "lat": 19.08,
-    "lng": 72.88,
-    "icon": "circle",
-    "label": "",
-    "labelOn": false
   },
   {
     "id": "mumbai_voicepop",
@@ -345,21 +270,6 @@
     "labelOn": false
   },
   {
-    "id": "seoul_pstn",
-    "name": "Seoul",
-    "city": "Seoul",
-    "state": "",
-    "country": "South Korea",
-    "region": "APAC",
-    "platform": "PSTN Carrier",
-    "type": "voicepop",
-    "lat": 37.57,
-    "lng": 126.98,
-    "icon": "circle",
-    "label": "",
-    "labelOn": false
-  },
-  {
     "id": "seoul_voicepop",
     "name": "Seoul",
     "city": "Seoul",
@@ -373,5 +283,40 @@
     "icon": "circle",
     "label": "",
     "labelOn": false
+  },
+  {
+    "id": "culpepper_equinix",
+    "name": "Culpepper",
+    "city": "Culpepper",
+    "state": "Virginia",
+    "country": "United States",
+    "region": "North America",
+    "platform": "Voice POP",
+    "type": "voicepop",
+    "address": "18155 Technology Dr, Culpepper, VA 22701",
+    "lat": 38.47,
+    "lng": -77.99,
+    "icon": "circle",
+    "label": "CUL",
+    "labelOn": true,
+    "provider": "Equinix",
+    "_labelDir": "top"
+  },
+  {
+    "id": "miami_equinix",
+    "name": "Miami",
+    "city": "Miami",
+    "state": "Florida",
+    "country": "United States",
+    "region": "North America",
+    "platform": "Voice POP",
+    "type": "voicepop",
+    "address": "50 NE 9th Street, Miami, FL 33132",
+    "lat": 25.78,
+    "lng": -80.19,
+    "icon": "circle",
+    "label": "MIA",
+    "labelOn": true,
+    "provider": "Equinix"
   }
 ]
