@@ -1,7 +1,0 @@
-{
-  "dataSource": "local",
-  "githubRawBase": "https://raw.githubusercontent.com/YOUR_ORG/YOUR_REPO/main/data/",
-  "mapTitle": "Global AI CX Reach & Coverage",
-  "defaultTheme": "dark",
-  "defaultLabels": true
-}
