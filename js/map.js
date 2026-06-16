@@ -510,22 +510,54 @@ function clearCoords() {
     document.getElementById('geo-st').textContent=''; document.getElementById('geo-st').className='geo-st';
   }
 }
+const GEO_CC = {
+  'united states':['us'],'usa':['us'],'u.s.a.':['us'],'u.s.':['us'],
+  'united kingdom':['gb'],'uk':['gb'],'great britain':['gb'],
+  'australia':['au'],'canada':['ca'],'germany':['de'],'france':['fr'],
+  'netherlands':['nl'],'singapore':['sg'],'japan':['jp'],'india':['in'],
+  'brazil':['br'],'mexico':['mx'],'south africa':['za'],'uae':['ae'],
+  'united arab emirates':['ae'],'new zealand':['nz'],'ireland':['ie'],
+  'israel':['il'],'saudi arabia':['sa'],'spain':['es'],'italy':['it'],
+  'sweden':['se'],'norway':['no'],'denmark':['dk'],'finland':['fi'],
+  'switzerland':['ch'],'austria':['at'],'belgium':['be'],'poland':['pl'],
+  'portugal':['pt'],'czech republic':['cz'],'hungary':['hu'],
+  'romania':['ro'],'greece':['gr'],'turkey':['tr'],'russia':['ru'],
+  'china':['cn'],'south korea':['kr'],'taiwan':['tw'],'hong kong':['hk'],
+  'indonesia':['id'],'malaysia':['my'],'thailand':['th'],'philippines':['ph'],
+  'vietnam':['vn'],'pakistan':['pk'],'bangladesh':['bd'],
+  'argentina':['ar'],'chile':['cl'],'colombia':['co'],'peru':['pe'],
+  'egypt':['eg'],'nigeria':['ng'],'kenya':['ke'],'ghana':['gh'],
+};
 async function geocode() {
   const name = document.getElementById('m-name').value.trim(); if (!name) { alert('Enter a location name first.'); return; }
   const st = document.getElementById('geo-st'); st.textContent='Looking up…'; st.className='geo-st';
+  // Build composite query from all filled fields for precision
+  const city    = document.getElementById('m-city').value.trim();
+  const country = document.getElementById('m-country').value.trim();
+  const stateVal = isUSA(country) ? document.getElementById('m-state').value : '';
+  const parts = [name];
+  if (city && city !== name) parts.push(city);
+  if (stateVal) parts.push(stateVal);
+  if (country) parts.push(country);
+  const q = parts.join(', ');
+  const cc = GEO_CC[country.toLowerCase()] || [];
+  const ccParam = cc.length ? `&countrycodes=${cc.join(',')}` : '';
   try {
-    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(name)}&limit=1&addressdetails=1`,{headers:{'Accept-Language':'en'}});
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(q)}&limit=5&addressdetails=1&accept-language=en${ccParam}`,{headers:{'Accept-Language':'en'}});
     const d = await r.json(); if (!d.length) throw 0;
-    document.getElementById('m-lat').value = parseFloat(d[0].lat).toFixed(4);
-    document.getElementById('m-lng').value = parseFloat(d[0].lon).toFixed(4);
-    if (!document.getElementById('m-city').value && d[0].address)
-      document.getElementById('m-city').value = d[0].address.city||d[0].address.town||d[0].address.village||'';
-    if (!document.getElementById('m-country').value && d[0].address)
-      document.getElementById('m-country').value = d[0].address.country||'';
+    // Prefer result matching the expected country
+    let best = d[0];
+    if (cc.length) { const m = d.find(x => cc.includes(x.address?.country_code)); if (m) best = m; }
+    document.getElementById('m-lat').value = parseFloat(best.lat).toFixed(4);
+    document.getElementById('m-lng').value = parseFloat(best.lon).toFixed(4);
+    if (!document.getElementById('m-city').value && best.address)
+      document.getElementById('m-city').value = best.address.city||best.address.town||best.address.village||'';
+    if (!document.getElementById('m-country').value && best.address)
+      document.getElementById('m-country').value = best.address.country||'';
     checkUSState();
-    if (d[0].address?.country_code==='us' && d[0].address?.state)
-      document.getElementById('m-state').value = d[0].address.state;
-    st.textContent = '✓ '+d[0].display_name.split(',').slice(0,2).join(','); st.className='geo-st ok';
+    if (best.address?.country_code==='us' && best.address?.state)
+      document.getElementById('m-state').value = best.address.state;
+    st.textContent = '✓ '+best.display_name.split(',').slice(0,3).join(','); st.className='geo-st ok';
   } catch {
     st.textContent='Not found — enter coordinates manually.'; st.className='geo-st err';
   }
