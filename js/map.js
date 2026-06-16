@@ -28,14 +28,16 @@ const PLAT_COLORS = ['#2B8EFF','#8B5CF6','#F59E0B','#22c55e','#f97316','#e879f9'
 const TILES = {
   darkBase:  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}',
   darkRef:   'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  darkNone:  'https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png',
   lightBase: 'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}',
   lightRef:  'https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}',
+  lightNone: 'https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png',
 };
 const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ';
 
 // ─── Mutable state ────────────────────────────────────────────────────────────
 let locations = [], platforms = [], typeConfig = {};
-let markerMap = {}, layerOn = { cxone:true, voice:true, sov:true };
+let markerMap = {}, coordOffsets = {}, layerOn = { cxone:true, voice:true, sov:true };
 let platformFilter = new Set(), pfTemp = new Set();
 let isDark = true, labelsOn = true, pinLabelsOn = true, panelOpen = false;
 let editingId = null, selIconVal = 'circle';
@@ -189,9 +191,13 @@ function refreshLayerButtons() {
 // ─── Tiles ────────────────────────────────────────────────────────────────────
 function applyTiles() {
   if (baseLayer) map.removeLayer(baseLayer);
-  if (refLayer)  map.removeLayer(refLayer);
-  baseLayer = L.tileLayer(isDark ? TILES.darkBase : TILES.lightBase, { attribution:ESRI_ATTR, maxZoom:19 }).addTo(map);
-  if (labelsOn) refLayer = L.tileLayer(isDark ? TILES.darkRef : TILES.lightRef, { attribution:'', maxZoom:19 }).addTo(map);
+  if (refLayer)  { map.removeLayer(refLayer); refLayer = null; }
+  if (labelsOn) {
+    baseLayer = L.tileLayer(isDark ? TILES.darkBase : TILES.lightBase, { attribution:ESRI_ATTR, maxZoom:19 }).addTo(map);
+    refLayer  = L.tileLayer(isDark ? TILES.darkRef  : TILES.lightRef,  { attribution:'', maxZoom:19 }).addTo(map);
+  } else {
+    baseLayer = L.tileLayer(isDark ? TILES.darkNone : TILES.lightNone, { attribution:'© <a href="https://carto.com">CartoDB</a>', maxZoom:19, subdomains:'abcd' }).addTo(map);
+  }
   baseLayer.bringToBack();
 }
 function toggleTheme() {
@@ -208,30 +214,31 @@ function toggleLabels() {
 }
 
 // ─── Icon builder ─────────────────────────────────────────────────────────────
-function buildIcon(type, shape) {
-  const c = (typeConfig[type] || DEFAULT_TYPE_CFG[type]).color, s=24, r=12;
+function buildIcon(type, shape, offsetIdx=0) {
+  const c = (typeConfig[type] || DEFAULT_TYPE_CFG[type]).color, s=22, r=11;
+  const ox = offsetIdx * 5; // 5px per co-located step (~80% overlap)
   let html, iS, iA, pA;
   switch (shape) {
     case 'pin':
-      html = `<svg width="20" height="28" viewBox="0 0 20 28"><path d="M10 1C5 1 1 5 1 10c0 6 9 17 9 17s9-11 9-17C19 5 15 1 10 1z" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/><circle cx="10" cy="10" r="4" fill="rgba(255,255,255,.85)"/></svg>`;
-      iS=[20,28]; iA=[10,27]; pA=[0,-28]; break;
+      html = `<svg width="18" height="25" viewBox="0 0 20 28"><path d="M10 1C5 1 1 5 1 10c0 6 9 17 9 17s9-11 9-17C19 5 15 1 10 1z" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/><circle cx="10" cy="10" r="4" fill="rgba(255,255,255,.85)"/></svg>`;
+      iS=[18,25]; iA=[9-ox,24]; pA=[0,-25]; break;
     case 'star': {
       const pts = Array.from({length:5}, (_,i) => {
         const a=(i*72-90)*Math.PI/180, b=(i*72-54)*Math.PI/180;
         return `${r+r*.9*Math.cos(a)},${r+r*.9*Math.sin(a)} ${r+r*.42*Math.cos(b)},${r+r*.42*Math.sin(b)}`;
       }).join(' ');
       html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><polygon points="${pts}" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5" stroke-linejoin="round"/></svg>`;
-      iS=[s,s]; iA=[r,r]; pA=[0,-r]; break;
+      iS=[s,s]; iA=[r-ox,r]; pA=[0,-r]; break;
     }
     case 'square':
       html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><rect x="2" y="2" width="${s-4}" height="${s-4}" rx="3" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/></svg>`;
-      iS=[s,s]; iA=[r,r]; pA=[0,-r]; break;
+      iS=[s,s]; iA=[r-ox,r]; pA=[0,-r]; break;
     case 'diamond':
       html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><polygon points="${r},2 ${s-2},${r} ${r},${s-2} 2,${r}" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="1.5"/></svg>`;
-      iS=[s,s]; iA=[r,r]; pA=[0,-r]; break;
+      iS=[s,s]; iA=[r-ox,r]; pA=[0,-r]; break;
     default:
       html = `<svg width="${s}" height="${s}" viewBox="0 0 ${s} ${s}"><circle cx="${r}" cy="${r}" r="${r-2}" fill="${c}" stroke="rgba(255,255,255,.8)" stroke-width="2"/></svg>`;
-      iS=[s,s]; iA=[r,r]; pA=[0,-r];
+      iS=[s,s]; iA=[r-ox,r]; pA=[0,-r];
   }
   return L.divIcon({ className:'', html, iconSize:iS, iconAnchor:iA, popupAnchor:pA });
 }
@@ -268,7 +275,7 @@ function chIcon(id, shape) {
   const loc = locations.find(l => l.id===id); if (!loc) return;
   loc.icon = shape; persist();
   const m = markerMap[id];
-  if (m) { m.setIcon(buildIcon(loc.type,shape)); m.setPopupContent(popupHTML(loc)); }
+  if (m) { m.setIcon(buildIcon(loc.type,shape,coordOffsets[id]||0)); m.setPopupContent(popupHTML(loc)); }
   renderTable(); syncGpinBtn();
 }
 
@@ -287,8 +294,18 @@ function applyAllVisibility() {
 }
 
 // ─── Markers ──────────────────────────────────────────────────────────────────
+function buildCoordOffsets() {
+  const groups = {};
+  locations.forEach(loc => {
+    const key = `${loc.lat},${loc.lng}`;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(loc.id);
+  });
+  coordOffsets = {};
+  Object.values(groups).forEach(ids => ids.forEach((id, idx) => coordOffsets[id] = idx));
+}
 function addMarker(loc) {
-  const m = L.marker([loc.lat, loc.lng], { icon: buildIcon(loc.type, loc.icon||'circle') });
+  const m = L.marker([loc.lat, loc.lng], { icon: buildIcon(loc.type, loc.icon||'circle', coordOffsets[loc.id]||0) });
   m.bindPopup(popupHTML(loc), { maxWidth:320 }); m.addTo(map);
   if (!isVisible(loc)) map.removeLayer(m);
   markerMap[loc.id] = m;
@@ -297,14 +314,20 @@ function addMarker(loc) {
 function removeLoc(id) {
   map.closePopup();
   const loc = locations.find(l => l.id===id); if (!loc) return;
+  const lat = loc.lat, lng = loc.lng;
   undoStack.push({...loc});
   if (markerMap[id]) map.removeLayer(markerMap[id]);
   delete markerMap[id];
   locations = locations.filter(l => l.id!==id);
+  buildCoordOffsets();
+  locations.filter(l => l.lat===lat && l.lng===lng).forEach(l => {
+    const m = markerMap[l.id]; if (m) m.setIcon(buildIcon(l.type, l.icon||'circle', coordOffsets[l.id]||0));
+  });
   persist(); updateCounts(); renderTable(); showToast(`"${loc.name}" removed`);
 }
 function renderAll() {
   Object.values(markerMap).forEach(m => map.removeLayer(m)); markerMap = {};
+  buildCoordOffsets();
   locations.forEach(addMarker); updateCounts(); renderTable(); syncGpinBtn();
   scheduleResolveOverlaps();
 }
@@ -345,7 +368,7 @@ function setAllIcons(shape) {
   locations.forEach(loc => {
     loc.icon = shape;
     const m = markerMap[loc.id];
-    if (m) { m.setIcon(buildIcon(loc.type,shape)); m.setPopupContent(popupHTML(loc)); }
+    if (m) { m.setIcon(buildIcon(loc.type,shape,coordOffsets[loc.id]||0)); m.setPopupContent(popupHTML(loc)); }
   });
   persist(); renderTable(); syncGpinBtn();
 }
@@ -587,11 +610,16 @@ function saveModal() {
     if (idx>-1) {
       locations[idx] = {...locations[idx],...data};
       const loc=locations[idx], m=markerMap[editingId];
-      if (m) { m.setLatLng([loc.lat,loc.lng]); m.setIcon(buildIcon(loc.type,loc.icon)); m.setPopupContent(popupHTML(loc)); if(!isVisible(loc)) map.removeLayer(m); else map.addLayer(m); }
+      buildCoordOffsets();
+      if (m) { m.setLatLng([loc.lat,loc.lng]); m.setIcon(buildIcon(loc.type,loc.icon,coordOffsets[editingId]||0)); m.setPopupContent(popupHTML(loc)); if(!isVisible(loc)) map.removeLayer(m); else map.addLayer(m); }
       refreshAllPinLabels();
     }
   } else {
-    const loc = {id:'c_'+Date.now(),...data}; locations.push(loc); addMarker(loc);
+    const loc = {id:'c_'+Date.now(),...data}; locations.push(loc);
+    const prevColocated = locations.filter(l => l.id!==loc.id && l.lat===loc.lat && l.lng===loc.lng);
+    buildCoordOffsets();
+    prevColocated.forEach(l => { const m=markerMap[l.id]; if(m) m.setIcon(buildIcon(l.type,l.icon||'circle',coordOffsets[l.id]||0)); });
+    addMarker(loc);
     map.flyTo([lat,lng], Math.max(map.getZoom(),5), {duration:1.2});
     setTimeout(() => markerMap[loc.id]?.openPopup(), 1400);
   }
@@ -641,7 +669,7 @@ function saveMT() {
   typeConfig = clone(mtWorking);
   locations.forEach(loc => {
     const m = markerMap[loc.id];
-    if (m) { m.setIcon(buildIcon(loc.type,loc.icon||'circle')); m.setPopupContent(popupHTML(loc)); }
+    if (m) { m.setIcon(buildIcon(loc.type,loc.icon||'circle',coordOffsets[loc.id]||0)); m.setPopupContent(popupHTML(loc)); }
   });
   refreshLayerButtons(); refreshLegend(); persist(); closeMT();
   showToast('Marker types updated ✓');
