@@ -102,9 +102,13 @@ td.dim{color:var(--muted);max-width:95px;white-space:nowrap;overflow:hidden;text
 .icon-picker-row{display:flex;gap:6px}
 .iopt{flex:1;background:var(--inp);border:1.5px solid var(--border);border-radius:7px;padding:6px 3px;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:2px;font-size:10px;color:var(--muted);transition:all .12s}
 .iopt.sel{border-color:var(--nice-pink);color:var(--text);background:var(--badge)} .iopt span{font-size:17px}
-.geocode-row{display:flex;gap:6px;align-items:center;margin-bottom:11px}
+.geocode-row{display:flex;gap:6px;align-items:center;margin-bottom:8px}
 .geo-btn{background:var(--badge);border:1px solid var(--border);border-radius:7px;color:#2B8EFF;font-size:11.5px;font-weight:600;padding:6px 11px;cursor:pointer;white-space:nowrap}
+.geo-btn.pick{color:var(--nice-pink)}
 .geo-st{font-size:11px;color:var(--muted);flex:1} .geo-st.ok{color:#22c55e} .geo-st.err{color:var(--nice-pink)}
+#modal-map-wrap{margin-bottom:10px;border-radius:8px;overflow:hidden;border:1px solid var(--border);display:none}
+.map-pick-hint{font-size:11px;color:var(--muted);padding:5px 10px;background:var(--badge);text-align:center;border-bottom:1px solid var(--border)}
+#modal-map-pick{height:260px}
 .modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
 .btn-c{background:none;border:1px solid var(--border);color:var(--muted);border-radius:7px;padding:6px 14px;font-size:12.5px;cursor:pointer}
 .btn-s{background:var(--nice-pink);border:none;color:#fff;border-radius:7px;padding:6px 14px;font-size:12.5px;font-weight:700;cursor:pointer}
@@ -134,6 +138,7 @@ td.dim{color:var(--muted);max-width:95px;white-space:nowrap;overflow:hidden;text
 .mt-preview{width:20px;height:20px;border-radius:50%;flex-shrink:0;border:2px solid rgba(128,128,180,.25)}
 .mt-label-inp{flex:1;background:transparent;border:none;border-bottom:1px solid var(--border);color:var(--text);font-size:12.5px;font-weight:500;padding:4px 2px}
 .mt-label-inp:focus{outline:none;border-bottom-color:var(--nice-pink)}
+.mt-key-inp{background:var(--badge);border:1px solid var(--border);border-radius:5px;color:var(--muted);padding:4px 6px}
 /* Legend */
 .map-legend{background:var(--panel)!important;border:1px solid var(--border)!important;border-radius:8px!important;padding:8px 12px!important;font-size:11px!important;color:var(--text)!important;pointer-events:none}
 .leg-t{font-weight:700;font-size:10px;margin-bottom:5px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
@@ -201,10 +206,8 @@ body.dark  .leaflet-control-zoom a{background:#1a1d2e;color:#eef;border-color:#2
 
 <div class="controls">
   <span class="clabel">Layers</span>
-  <button class="layer-btn active" data-layer="all"   onclick="toggleLayer('all')"  ><span class="dot" id="dot-all"   style="background:linear-gradient(135deg,#2B8EFF,#8B5CF6)"></span>All <span class="cnt" id="cnt-all">—</span></button>
-  <button class="layer-btn active" data-layer="cxone" onclick="toggleLayer('cxone')"><span class="dot" id="dot-cxone" style="background:#2B8EFF"></span>CXone + Cognigy <span class="cnt" id="cnt-cxone">—</span></button>
-  <button class="layer-btn active" data-layer="voice" onclick="toggleLayer('voice')"><span class="dot" id="dot-voice" style="background:#8B5CF6"></span>Voice POP <span class="cnt" id="cnt-voice">—</span></button>
-  <button class="layer-btn active" data-layer="sov"   onclick="toggleLayer('sov')"  ><span class="dot" id="dot-sov"   style="background:#F59E0B"></span>SOV + Voice <span class="cnt" id="cnt-sov">—</span></button>
+  <button class="layer-btn active" data-layer="all" onclick="toggleLayer('all')"><span class="dot" id="dot-all"></span>All <span class="cnt" id="cnt-all">—</span></button>
+  <div id="layer-btns-dynamic" style="display:contents"></div>
 
   <div class="sep"></div>
   <span class="clabel">Filter</span>
@@ -315,7 +318,7 @@ body.dark  .leaflet-control-zoom a{background:#1a1d2e;color:#eef;border-color:#2
     <div class="fg"><label>Platform / Service</label>
       <select id="m-plat" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--badge);color:var(--fg);font-size:12px"></select>
     </div>
-    <div class="fg"><label>Marker Colour</label><select id="m-type"></select></div>
+    <div class="fg"><label>Marker Color</label><select id="m-type"></select></div>
     <div class="fg">
       <label>Pin Label</label>
       <div class="label-row">
@@ -338,7 +341,12 @@ body.dark  .leaflet-control-zoom a{background:#1a1d2e;color:#eef;border-color:#2
     </div>
     <div class="geocode-row">
       <button class="geo-btn" onclick="geocode()">🔍 Look up from name</button>
+      <button class="geo-btn pick" onclick="toggleMapPicker()">📍 Pick on Map</button>
       <span class="geo-st" id="geo-st">or right-click the map to set coordinates</span>
+    </div>
+    <div id="modal-map-wrap">
+      <div class="map-pick-hint">Click anywhere on the map to set coordinates</div>
+      <div id="modal-map-pick"></div>
     </div>
     <div class="modal-actions">
       <button class="btn-c" onclick="closeModal()">Cancel</button>
@@ -385,10 +393,13 @@ body.dark  .leaflet-control-zoom a{background:#1a1d2e;color:#eef;border-color:#2
 
 <!-- Marker Type Editor Modal -->
 <div class="overlay" id="mt-overlay">
-  <div class="modal" style="width:480px">
+  <div class="modal" style="width:500px">
     <h2>🎨 Marker <span class="p">Types</span></h2>
-    <p style="font-size:11.5px;color:var(--muted);margin-bottom:16px">Customise the colour and label for each marker type. Changes apply to all pins, layer buttons, and the legend.</p>
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Customize the color and label for each marker type. Types in use by locations cannot be deleted.</p>
     <div id="mt-list"></div>
+    <div style="margin-top:10px">
+      <button class="ctrl-btn" onclick="addMTRow()" style="font-size:12px">＋ Add Type</button>
+    </div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn-c" onclick="closeMT()">Cancel</button>
       <button class="btn-s" onclick="saveMT()">Apply Changes</button>
@@ -495,7 +506,7 @@ const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ';
 
 // ── Mutable state ──────────────────────────────────────────────────────────────
 let locations=[], platforms=[], typeConfig={};
-let markerMap={}, coordOffsets={}, layerOn={cxone:true,voice:true,sov:true};
+let markerMap={}, coordOffsets={}, layerOn={};
 let platformFilter=new Set(), pfTemp=new Set();
 let isDark=true, labelsOn=true, pinLabelsOn=true, panelOpen=false;
 let editingId=null, selIconVal='circle';
@@ -515,6 +526,8 @@ function boot(){
   locations   = tryParseArr(localStorage.getItem('nice_locs'))    || clone(DEFAULT_LOCATIONS);
   platforms   = tryParseArr(localStorage.getItem('nice_plats'))   || clone(DEFAULT_PLATFORMS);
   typeConfig  = tryParseObj(localStorage.getItem('nice_typecfg')) || clone(DEFAULT_TYPE_CFG);
+  layerOn = {};
+  Object.keys(typeConfig).forEach(k => layerOn[k] = true);
   const th    = localStorage.getItem('nice_theme');
   const lb    = localStorage.getItem('nice_labels');
   const pl    = localStorage.getItem('nice_pinlabels');
@@ -568,20 +581,34 @@ function refreshLegend(){
     `<div style="margin-top:6px;font-size:10px;color:var(--muted)">Click marker for details<br>Right-click map to add pin</div>`;
 }
 
-function refreshLayerButtons(){
-  ['cxone','voice','sov'].forEach(t=>{
-    const dot=document.getElementById('dot-'+t);
-    if(dot) dot.style.background=typeConfig[t]?.color||'#888';
-    const btn=document.querySelector(`.layer-btn[data-layer="${t}"]`);
-    if(btn&&btn.classList.contains('active')){
-      btn.style.color=typeConfig[t]?.color||'';
-      btn.style.borderColor=typeConfig[t]?.color||'';
-    }
-  });
+function renderLayerButtons(){
+  const container=document.getElementById('layer-btns-dynamic');
+  if(!container) return;
+  const keys=Object.keys(typeConfig);
+  container.innerHTML=keys.map(key=>{
+    const cfg=typeConfig[key];
+    const on=layerOn[key]!==false;
+    return `<button class="layer-btn${on?' active':''}" data-layer="${key}" onclick="toggleLayer('${key}')">` +
+      `<span class="dot" id="dot-${key}" style="background:${cfg.color}"></span>${cfg.label} ` +
+      `<span class="cnt" id="cnt-${key}">—</span></button>`;
+  }).join('');
+  // Update All dot gradient
   const allDot=document.getElementById('dot-all');
-  if(allDot) allDot.style.background=`linear-gradient(135deg,${typeConfig.cxone?.color||'#2B8EFF'},${typeConfig.voice?.color||'#8B5CF6'})`;
-  buildTypeSelect(document.getElementById('m-type')?.value||'cxone');
+  if(allDot){
+    const colors=keys.map(k=>typeConfig[k].color);
+    allDot.style.background=colors.length>=2
+      ?`linear-gradient(135deg,${colors[0]},${colors[1]})`
+      :(colors[0]||'#888');
+  }
+  // Reapply active styles
+  keys.forEach(t=>{
+    const on=layerOn[t]!==false;
+    setAct(t,on);
+  });
+  setAct('all',Object.values(layerOn).every(v=>v!==false));
+  buildTypeSelect(document.getElementById('m-type')?.value||Object.keys(typeConfig)[0]||'');
 }
+function refreshLayerButtons(){ renderLayerButtons(); }
 
 // ── Tiles ──────────────────────────────────────────────────────────────────────
 function applyTiles(){
@@ -679,7 +706,7 @@ function chIcon(id,shape){
 }
 
 // ── Visibility ─────────────────────────────────────────────────────────────────
-function isVisible(loc){ if(!layerOn[loc.type]) return false; if(platformFilter.size===0) return true; return platformFilter.has(loc.platform); }
+function isVisible(loc){ if(layerOn[loc.type]===false) return false; if(platformFilter.size===0) return true; return platformFilter.has(loc.platform); }
 function applyAllVisibility(){ locations.forEach(loc=>{const m=markerMap[loc.id];if(!m) return;if(isVisible(loc)) map.addLayer(m);else map.removeLayer(m)}); scheduleResolveOverlaps(); }
 
 // ── Markers ────────────────────────────────────────────────────────────────────
@@ -724,11 +751,10 @@ function renderAll(){
   scheduleResolveOverlaps();
 }
 function updateCounts(){
-  const c={cxone:0,voice:0,sov:0};
-  locations.forEach(l=>c[l.type]++);
-  document.getElementById('cnt-cxone').textContent=c.cxone;
-  document.getElementById('cnt-voice').textContent=c.voice;
-  document.getElementById('cnt-sov').textContent=c.sov;
+  const c={};
+  Object.keys(typeConfig).forEach(k=>c[k]=0);
+  locations.forEach(l=>{ if(c[l.type]!==undefined) c[l.type]++; else c[l.type]=(c[l.type]||0)+1; });
+  Object.keys(c).forEach(k=>{ const el=document.getElementById('cnt-'+k); if(el) el.textContent=c[k]; });
   document.getElementById('cnt-all').textContent=locations.length;
   document.getElementById('stat-total').textContent=locations.length;
   document.getElementById('sp-count').textContent=locations.length+' total';
@@ -737,13 +763,13 @@ function updateCounts(){
 // ── Layer toggle ───────────────────────────────────────────────────────────────
 function toggleLayer(layer){
   if(layer==='all'){
-    const on=Object.values(layerOn).some(v=>!v);
-    ['cxone','voice','sov'].forEach(t=>{layerOn[t]=on;setAct(t,on)});
+    const on=Object.values(layerOn).some(v=>v===false);
+    Object.keys(layerOn).forEach(t=>{layerOn[t]=on;setAct(t,on)});
     setAct('all',on);
   } else {
-    layerOn[layer]=!layerOn[layer];
-    setAct(layer,layerOn[layer]);
-    setAct('all',Object.values(layerOn).every(v=>v));
+    layerOn[layer]=layerOn[layer]===false?true:false;
+    setAct(layer,layerOn[layer]!==false);
+    setAct('all',Object.values(layerOn).every(v=>v!==false));
   }
   applyAllVisibility();
 }
@@ -1004,9 +1030,16 @@ function openModal(id){
   if(loc?.state){ document.getElementById('m-state').value=loc.state }
   document.getElementById('geo-st').textContent='or right-click the map to set coordinates';
   document.getElementById('geo-st').className='geo-st';
+  // Reset map picker
+  document.getElementById('modal-map-wrap').style.display='none';
+  if(modalPickerMarker&&modalPickerMap){modalPickerMap.removeLayer(modalPickerMarker);modalPickerMarker=null;}
   document.getElementById('modal').classList.add('open');
 }
-function closeModal(){ document.getElementById('modal').classList.remove('open'); editingId=null }
+function closeModal(){
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('modal-map-wrap').style.display='none';
+  editingId=null;
+}
 function selIcon(shape){ selIconVal=shape; document.querySelectorAll('#m-icon-picker .iopt').forEach(el=>el.classList.toggle('sel',el.dataset.icon===shape)) }
 function clearCoords(){ if(!editingId){ document.getElementById('m-lat').value=''; document.getElementById('m-lng').value=''; document.getElementById('geo-st').textContent=''; document.getElementById('geo-st').className='geo-st' } }
 
@@ -1058,7 +1091,49 @@ async function geocode(){
     if(best.address?.country_code==='us'&&best.address?.state)
       document.getElementById('m-state').value=best.address.state;
     st.textContent='✓ '+best.display_name.split(',').slice(0,3).join(','); st.className='geo-st ok';
-  } catch{ st.textContent='Not found — enter coordinates manually.'; st.className='geo-st err' }
+  } catch{
+    st.textContent='Not found — click "📍 Pick on Map" to place manually.';
+    st.className='geo-st err';
+    openMapPicker();
+  }
+}
+
+// ── Map coordinate picker ──────────────────────────────────────────────────────
+let modalPickerMap=null, modalPickerMarker=null;
+function toggleMapPicker(){
+  const wrap=document.getElementById('modal-map-wrap');
+  if(wrap.style.display!=='none'){ wrap.style.display='none'; return; }
+  openMapPicker();
+}
+function openMapPicker(){
+  const wrap=document.getElementById('modal-map-wrap');
+  wrap.style.display='block';
+  if(!modalPickerMap){
+    modalPickerMap=L.map('modal-map-pick',{center:[20,10],zoom:2,zoomControl:true,attributionControl:false});
+    // Match main map tile style
+    const baseUrl=labelsOn?(isDark?TILES.darkBase:TILES.lightBase):(isDark?TILES.darkNone:TILES.lightNone);
+    L.tileLayer(baseUrl,{maxZoom:19,subdomains:'abcd'}).addTo(modalPickerMap);
+    if(labelsOn) L.tileLayer(isDark?TILES.darkRef:TILES.lightRef,{maxZoom:19}).addTo(modalPickerMap);
+    modalPickerMap.on('click',e=>{
+      const lat=e.latlng.lat, lng=e.latlng.lng;
+      document.getElementById('m-lat').value=lat.toFixed(4);
+      document.getElementById('m-lng').value=lng.toFixed(4);
+      const st=document.getElementById('geo-st');
+      st.textContent=`📍 ${lat.toFixed(4)}, ${lng.toFixed(4)} — coordinates set`;
+      st.className='geo-st ok';
+      if(modalPickerMarker) modalPickerMarker.setLatLng(e.latlng);
+      else modalPickerMarker=L.circleMarker(e.latlng,{radius:8,color:'#e8175d',fillColor:'#e8175d',fillOpacity:.85,weight:2}).addTo(modalPickerMap);
+    });
+  }
+  // If coords already set, fly to them and show marker
+  const lat=parseFloat(document.getElementById('m-lat').value);
+  const lng=parseFloat(document.getElementById('m-lng').value);
+  if(!isNaN(lat)&&!isNaN(lng)){
+    modalPickerMap.setView([lat,lng],6);
+    if(modalPickerMarker) modalPickerMarker.setLatLng([lat,lng]);
+    else modalPickerMarker=L.circleMarker([lat,lng],{radius:8,color:'#e8175d',fillColor:'#e8175d',fillOpacity:.85,weight:2}).addTo(modalPickerMap);
+  }
+  setTimeout(()=>modalPickerMap.invalidateSize(),80);
 }
 
 function saveModal(){
@@ -1131,26 +1206,60 @@ function closeMT(){ document.getElementById('mt-overlay').classList.remove('open
 function renderMTList(){
   const list=document.getElementById('mt-list'); list.innerHTML='';
   Object.entries(mtWorking).forEach(([key,cfg])=>{
-    const row=document.createElement('div'); row.className='mt-row';
+    const inUse=locations.some(l=>l.type===key);
+    const row=document.createElement('div'); row.className='mt-row'; row.id='mt-row-'+key;
     row.innerHTML=`
-      <span class="mt-key">${key}</span>
+      <input type="text" class="mt-key-inp" value="${key}"
+        onchange="renameMTKey('${key}', this.value)"
+        title="Type key (used internally)" style="width:90px;font-size:11px;font-family:monospace">
       <input type="color" class="mt-color-inp" value="${cfg.color}"
         oninput="mtWorking['${key}'].color=this.value;document.getElementById('mt-prev-${key}').style.background=this.value">
       <div class="mt-preview" id="mt-prev-${key}" style="background:${cfg.color}"></div>
       <input type="text" class="mt-label-inp" value="${cfg.label}"
-        oninput="mtWorking['${key}'].label=this.value" placeholder="Label for ${key}">
+        oninput="mtWorking['${key}'].label=this.value" placeholder="Display label">
+      <button onclick="deleteMTRow('${key}')" title="${inUse?'In use by '+locations.filter(l=>l.type===key).length+' location(s) — cannot delete':'Delete this type'}"
+        style="background:none;border:none;cursor:${inUse?'not-allowed':'pointer'};color:${inUse?'var(--muted)':'#ef4444'};font-size:16px;padding:0 4px"
+        ${inUse?'disabled':''}>✕</button>
     `;
     list.appendChild(row);
   });
 }
+function addMTRow(){
+  let n=Object.keys(mtWorking).length+1;
+  let key='type'+n;
+  while(mtWorking[key]){n++;key='type'+n;}
+  const usedColors=Object.values(mtWorking).map(c=>c.color);
+  const palette=['#22c55e','#f97316','#e879f9','#06b6d4','#a3e635','#fb7185','#a78bfa','#fbbf24'];
+  const color=palette.find(c=>!usedColors.includes(c))||'#'+Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+  mtWorking[key]={color,label:''};
+  renderMTList();
+}
+function deleteMTRow(key){
+  const inUse=locations.some(l=>l.type===key);
+  if(inUse){showToast('Cannot delete — type is used by locations.');return;}
+  delete mtWorking[key];
+  renderMTList();
+}
+function renameMTKey(oldKey,newKey){
+  newKey=newKey.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  if(!newKey||newKey===oldKey||mtWorking[newKey]) return;
+  const rebuilt={};
+  Object.entries(mtWorking).forEach(([k,v])=>{rebuilt[k===oldKey?newKey:k]=v;});
+  mtWorking=rebuilt;
+  renderMTList();
+}
 function saveMT(){
   typeConfig=clone(mtWorking);
-  // Re-render all markers with new colours
+  // Rebuild layerOn — keep existing on/off states, add new keys as true, drop removed keys
+  const newLayerOn={};
+  Object.keys(typeConfig).forEach(k=>newLayerOn[k]=layerOn[k]!==false);
+  layerOn=newLayerOn;
+  // Re-render all markers with new colors
   locations.forEach(loc=>{
     const m=markerMap[loc.id];
     if(m){m.setIcon(buildIcon(loc.type,loc.icon||'circle',coordOffsets[loc.id]||0));m.setPopupContent(popupHTML(loc))}
   });
-  refreshLayerButtons(); refreshLegend(); persist(); closeMT();
+  renderLayerButtons(); refreshLegend(); renderAll(); persist(); closeMT();
   showToast('Marker types updated ✓');
 }
 
@@ -1230,7 +1339,7 @@ function handleImportFile(e){
 }
 
 function resetToDefaults(){
-  if(!confirm('Reset ALL settings (locations, platforms, marker colours, theme) to defaults?')) return;
+  if(!confirm('Reset ALL settings (locations, platforms, marker colors, theme) to defaults?')) return;
   locations=clone(DEFAULT_LOCATIONS); platforms=clone(DEFAULT_PLATFORMS); typeConfig=clone(DEFAULT_TYPE_CFG);
   isDark=true; labelsOn=true; pinLabelsOn=true;
   document.body.className='dark';

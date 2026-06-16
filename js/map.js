@@ -37,7 +37,7 @@ const ESRI_ATTR = 'Tiles &copy; Esri &mdash; Esri, DeLorme, NAVTEQ';
 
 // ─── Mutable state ────────────────────────────────────────────────────────────
 let locations = [], platforms = [], typeConfig = {};
-let markerMap = {}, coordOffsets = {}, layerOn = { cxone:true, voice:true, sov:true };
+let markerMap = {}, coordOffsets = {}, layerOn = {};
 let platformFilter = new Set(), pfTemp = new Set();
 let isDark = true, labelsOn = true, pinLabelsOn = true, panelOpen = false;
 let editingId = null, selIconVal = 'circle';
@@ -72,6 +72,8 @@ async function boot() {
 
   // Restore typeConfig from localStorage, then theme/labels
   typeConfig = tryParseObj(localStorage.getItem('nice_typecfg')) || clone(DEFAULT_TYPE_CFG);
+  layerOn = {};
+  Object.keys(typeConfig).forEach(k => layerOn[k] = true);
   const storedTheme     = localStorage.getItem('nice_theme');
   const storedLabels    = localStorage.getItem('nice_labels');
   const storedPinLabels = localStorage.getItem('nice_pinlabels');
@@ -170,20 +172,34 @@ function refreshLegend() {
     `<div style="margin-top:6px;font-size:10px;color:var(--muted)">Click marker for details<br>Right-click map to add pin</div>`;
 }
 
-function refreshLayerButtons() {
-  ['cxone','voice','sov'].forEach(t => {
-    const dot = document.getElementById('dot-' + t);
-    if (dot) dot.style.background = typeConfig[t]?.color || '#888';
-    const btn = document.querySelector(`.layer-btn[data-layer="${t}"]`);
-    if (btn && btn.classList.contains('active')) {
-      btn.style.color = typeConfig[t]?.color || '';
-      btn.style.borderColor = typeConfig[t]?.color || '';
-    }
-  });
+function renderLayerButtons() {
+  const container = document.getElementById('layer-btns-dynamic');
+  if (!container) return;
+  const keys = Object.keys(typeConfig);
+  container.innerHTML = keys.map(key => {
+    const cfg = typeConfig[key];
+    const on = layerOn[key] !== false;
+    return `<button class="layer-btn${on?' active':''}" data-layer="${key}" onclick="toggleLayer('${key}')">` +
+      `<span class="dot" id="dot-${key}" style="background:${cfg.color}"></span>${cfg.label} ` +
+      `<span class="cnt" id="cnt-${key}">—</span></button>`;
+  }).join('');
+  // Update All dot gradient
   const allDot = document.getElementById('dot-all');
-  if (allDot) allDot.style.background = `linear-gradient(135deg,${typeConfig.cxone?.color||'#2B8EFF'},${typeConfig.voice?.color||'#8B5CF6'})`;
-  buildTypeSelect(document.getElementById('m-type')?.value || 'cxone');
+  if (allDot) {
+    const colors = keys.map(k => typeConfig[k].color);
+    allDot.style.background = colors.length >= 2
+      ? `linear-gradient(135deg,${colors[0]},${colors[1]})`
+      : (colors[0] || '#888');
+  }
+  // Reapply active styles
+  keys.forEach(t => {
+    const on = layerOn[t] !== false;
+    setAct(t, on);
+  });
+  setAct('all', Object.values(layerOn).every(v => v !== false));
+  buildTypeSelect(document.getElementById('m-type')?.value || Object.keys(typeConfig)[0] || '');
 }
+function refreshLayerButtons() { renderLayerButtons(); }
 
 // ─── Tiles ────────────────────────────────────────────────────────────────────
 function applyTiles() {
@@ -282,7 +298,7 @@ function chIcon(id, shape) {
 
 // ─── Visibility ───────────────────────────────────────────────────────────────
 function isVisible(loc) {
-  if (!layerOn[loc.type]) return false;
+  if (layerOn[loc.type] === false) return false;
   if (platformFilter.size === 0) return true;
   return platformFilter.has(loc.platform);
 }
@@ -333,11 +349,10 @@ function renderAll() {
   scheduleResolveOverlaps();
 }
 function updateCounts() {
-  const c = { cxone:0, voice:0, sov:0 };
-  locations.forEach(l => c[l.type]++);
-  document.getElementById('cnt-cxone').textContent = c.cxone;
-  document.getElementById('cnt-voice').textContent = c.voice;
-  document.getElementById('cnt-sov').textContent   = c.sov;
+  const c = {};
+  Object.keys(typeConfig).forEach(k => c[k] = 0);
+  locations.forEach(l => { if (c[l.type] !== undefined) c[l.type]++; else c[l.type] = (c[l.type] || 0) + 1; });
+  Object.keys(c).forEach(k => { const el = document.getElementById('cnt-' + k); if (el) el.textContent = c[k]; });
   document.getElementById('cnt-all').textContent   = locations.length;
   document.getElementById('stat-total').textContent = locations.length;
   document.getElementById('sp-count').textContent  = locations.length + ' total';
@@ -346,13 +361,13 @@ function updateCounts() {
 // ─── Layer toggle ─────────────────────────────────────────────────────────────
 function toggleLayer(layer) {
   if (layer === 'all') {
-    const on = Object.values(layerOn).some(v => !v);
-    ['cxone','voice','sov'].forEach(t => { layerOn[t]=on; setAct(t,on); });
+    const on = Object.values(layerOn).some(v => v === false);
+    Object.keys(layerOn).forEach(t => { layerOn[t]=on; setAct(t,on); });
     setAct('all', on);
   } else {
-    layerOn[layer] = !layerOn[layer];
-    setAct(layer, layerOn[layer]);
-    setAct('all', Object.values(layerOn).every(v => v));
+    layerOn[layer] = layerOn[layer] === false ? true : false;
+    setAct(layer, layerOn[layer] !== false);
+    setAct('all', Object.values(layerOn).every(v => v !== false));
   }
   applyAllVisibility();
 }
@@ -619,9 +634,16 @@ function openModal(id) {
   if (loc?.state) document.getElementById('m-state').value = loc.state;
   document.getElementById('geo-st').textContent = 'or right-click the map to set coordinates';
   document.getElementById('geo-st').className = 'geo-st';
+  // Reset map picker
+  document.getElementById('modal-map-wrap').style.display = 'none';
+  if (modalPickerMarker && modalPickerMap) { modalPickerMap.removeLayer(modalPickerMarker); modalPickerMarker = null; }
   document.getElementById('modal').classList.add('open');
 }
-function closeModal() { document.getElementById('modal').classList.remove('open'); editingId=null; }
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+  document.getElementById('modal-map-wrap').style.display = 'none';
+  editingId = null;
+}
 function selIcon(shape) { selIconVal=shape; document.querySelectorAll('#m-icon-picker .iopt').forEach(el=>el.classList.toggle('sel',el.dataset.icon===shape)); }
 function clearCoords() {
   if (!editingId) {
@@ -678,9 +700,48 @@ async function geocode() {
       document.getElementById('m-state').value = best.address.state;
     st.textContent = '✓ '+best.display_name.split(',').slice(0,3).join(','); st.className='geo-st ok';
   } catch {
-    st.textContent='Not found — enter coordinates manually.'; st.className='geo-st err';
+    st.textContent = 'Not found — click "📍 Pick on Map" to place manually.';
+    st.className = 'geo-st err';
+    openMapPicker();
   }
 }
+
+// ── Map coordinate picker ──────────────────────────────────────────────────────
+let modalPickerMap = null, modalPickerMarker = null;
+function toggleMapPicker() {
+  const wrap = document.getElementById('modal-map-wrap');
+  if (wrap.style.display !== 'none') { wrap.style.display = 'none'; return; }
+  openMapPicker();
+}
+function openMapPicker() {
+  const wrap = document.getElementById('modal-map-wrap');
+  wrap.style.display = 'block';
+  if (!modalPickerMap) {
+    modalPickerMap = L.map('modal-map-pick', { center:[20,10], zoom:2, zoomControl:true, attributionControl:false });
+    const baseUrl = labelsOn ? (isDark ? TILES.darkBase : TILES.lightBase) : (isDark ? TILES.darkNone : TILES.lightNone);
+    L.tileLayer(baseUrl, { maxZoom:19, subdomains:'abcd' }).addTo(modalPickerMap);
+    if (labelsOn) L.tileLayer(isDark ? TILES.darkRef : TILES.lightRef, { maxZoom:19 }).addTo(modalPickerMap);
+    modalPickerMap.on('click', e => {
+      const lat = e.latlng.lat, lng = e.latlng.lng;
+      document.getElementById('m-lat').value = lat.toFixed(4);
+      document.getElementById('m-lng').value = lng.toFixed(4);
+      const st = document.getElementById('geo-st');
+      st.textContent = `📍 ${lat.toFixed(4)}, ${lng.toFixed(4)} — coordinates set`;
+      st.className = 'geo-st ok';
+      if (modalPickerMarker) modalPickerMarker.setLatLng(e.latlng);
+      else modalPickerMarker = L.circleMarker(e.latlng, { radius:8, color:'#e8175d', fillColor:'#e8175d', fillOpacity:.85, weight:2 }).addTo(modalPickerMap);
+    });
+  }
+  const lat = parseFloat(document.getElementById('m-lat').value);
+  const lng = parseFloat(document.getElementById('m-lng').value);
+  if (!isNaN(lat) && !isNaN(lng)) {
+    modalPickerMap.setView([lat, lng], 6);
+    if (modalPickerMarker) modalPickerMarker.setLatLng([lat, lng]);
+    else modalPickerMarker = L.circleMarker([lat, lng], { radius:8, color:'#e8175d', fillColor:'#e8175d', fillOpacity:.85, weight:2 }).addTo(modalPickerMap);
+  }
+  setTimeout(() => modalPickerMap.invalidateSize(), 80);
+}
+
 function saveModal() {
   const name = document.getElementById('m-name').value.trim();
   const lat  = parseFloat(document.getElementById('m-lat').value);
@@ -748,24 +809,58 @@ function closeMT() { document.getElementById('mt-overlay').classList.remove('ope
 function renderMTList() {
   const list=document.getElementById('mt-list'); list.innerHTML='';
   Object.entries(mtWorking).forEach(([key,cfg]) => {
-    const row=document.createElement('div'); row.className='mt-row';
+    const inUse = locations.some(l => l.type === key);
+    const row=document.createElement('div'); row.className='mt-row'; row.id='mt-row-'+key;
     row.innerHTML=`
-      <span class="mt-key">${key}</span>
+      <input type="text" class="mt-key-inp" value="${key}"
+        onchange="renameMTKey('${key}', this.value)"
+        title="Type key (used internally)" style="width:90px;font-size:11px;font-family:monospace">
       <input type="color" class="mt-color-inp" value="${cfg.color}"
         oninput="mtWorking['${key}'].color=this.value;document.getElementById('mt-prev-${key}').style.background=this.value">
       <div class="mt-preview" id="mt-prev-${key}" style="background:${cfg.color}"></div>
       <input type="text" class="mt-label-inp" value="${cfg.label}"
-        oninput="mtWorking['${key}'].label=this.value" placeholder="Label for ${key}">`;
+        oninput="mtWorking['${key}'].label=this.value" placeholder="Display label">
+      <button onclick="deleteMTRow('${key}')" title="${inUse?'In use by '+locations.filter(l=>l.type===key).length+' location(s) — cannot delete':'Delete this type'}"
+        style="background:none;border:none;cursor:${inUse?'not-allowed':'pointer'};color:${inUse?'var(--muted)':'#ef4444'};font-size:16px;padding:0 4px"
+        ${inUse?'disabled':''}>✕</button>`;
     list.appendChild(row);
   });
 }
+function addMTRow() {
+  let n = Object.keys(mtWorking).length + 1;
+  let key = 'type' + n;
+  while (mtWorking[key]) { n++; key = 'type' + n; }
+  const usedColors = Object.values(mtWorking).map(c => c.color);
+  const palette = ['#22c55e','#f97316','#e879f9','#06b6d4','#a3e635','#fb7185','#a78bfa','#fbbf24'];
+  const color = palette.find(c => !usedColors.includes(c)) || '#' + Math.floor(Math.random()*0xFFFFFF).toString(16).padStart(6,'0');
+  mtWorking[key] = { color, label: '' };
+  renderMTList();
+}
+function deleteMTRow(key) {
+  const inUse = locations.some(l => l.type === key);
+  if (inUse) { showToast('Cannot delete — type is used by locations.'); return; }
+  delete mtWorking[key];
+  renderMTList();
+}
+function renameMTKey(oldKey, newKey) {
+  newKey = newKey.trim().toLowerCase().replace(/\s+/g,'_').replace(/[^a-z0-9_]/g,'');
+  if (!newKey || newKey === oldKey || mtWorking[newKey]) return;
+  const rebuilt = {};
+  Object.entries(mtWorking).forEach(([k,v]) => { rebuilt[k===oldKey?newKey:k] = v; });
+  mtWorking = rebuilt;
+  renderMTList();
+}
 function saveMT() {
   typeConfig = clone(mtWorking);
+  // Rebuild layerOn — keep existing on/off states, add new keys as true, drop removed keys
+  const newLayerOn = {};
+  Object.keys(typeConfig).forEach(k => newLayerOn[k] = layerOn[k] !== false);
+  layerOn = newLayerOn;
   locations.forEach(loc => {
     const m = markerMap[loc.id];
     if (m) { m.setIcon(buildIcon(loc.type,loc.icon||'circle',coordOffsets[loc.id]||0)); m.setPopupContent(popupHTML(loc)); }
   });
-  refreshLayerButtons(); refreshLegend(); persist(); closeMT();
+  renderLayerButtons(); refreshLegend(); renderAll(); persist(); closeMT();
   showToast('Marker types updated ✓');
 }
 

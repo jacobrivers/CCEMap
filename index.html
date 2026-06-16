@@ -33,10 +33,8 @@
 <!-- Controls -->
 <div class="controls">
   <span class="clabel">Layers</span>
-  <button class="layer-btn active" data-layer="all"   onclick="toggleLayer('all')"  ><span class="dot" id="dot-all"   style="background:linear-gradient(135deg,#2B8EFF,#8B5CF6)"></span>All   <span class="cnt" id="cnt-all">—</span></button>
-  <button class="layer-btn active" data-layer="cxone" onclick="toggleLayer('cxone')"><span class="dot" id="dot-cxone" style="background:#2B8EFF"></span>CXone + Cognigy <span class="cnt" id="cnt-cxone">—</span></button>
-  <button class="layer-btn active" data-layer="voice" onclick="toggleLayer('voice')"><span class="dot" id="dot-voice" style="background:#8B5CF6"></span>Voice POP <span class="cnt" id="cnt-voice">—</span></button>
-  <button class="layer-btn active" data-layer="sov"   onclick="toggleLayer('sov')"  ><span class="dot" id="dot-sov"   style="background:#F59E0B"></span>SOV + Voice <span class="cnt" id="cnt-sov">—</span></button>
+  <button class="layer-btn active" data-layer="all" onclick="toggleLayer('all')"><span class="dot" id="dot-all"></span>All <span class="cnt" id="cnt-all">—</span></button>
+  <div id="layer-btns-dynamic" style="display:contents"></div>
 
   <div class="sep"></div>
   <span class="clabel">Filter</span>
@@ -152,7 +150,7 @@
     <div class="fg"><label>Platform / Service</label>
       <select id="m-plat" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--badge);color:var(--fg);font-size:12px"></select>
     </div>
-    <div class="fg"><label>Marker Colour</label>
+    <div class="fg"><label>Marker Color</label>
       <select id="m-type"></select>
     </div>
     <div class="fg">
@@ -177,7 +175,12 @@
     </div>
     <div class="geocode-row">
       <button class="geo-btn" onclick="geocode()">🔍 Look up from name</button>
+      <button class="geo-btn pick" onclick="toggleMapPicker()">📍 Pick on Map</button>
       <span class="geo-st" id="geo-st">or right-click the map to set coordinates</span>
+    </div>
+    <div id="modal-map-wrap">
+      <div class="map-pick-hint">Click anywhere on the map to set coordinates</div>
+      <div id="modal-map-pick"></div>
     </div>
     <div class="modal-actions">
       <button class="btn-c" onclick="closeModal()">Cancel</button>
@@ -224,10 +227,13 @@
 
 <!-- Marker Type Editor Modal -->
 <div class="overlay" id="mt-overlay">
-  <div class="modal" style="width:480px">
+  <div class="modal" style="width:500px">
     <h2>🎨 Marker <span class="p">Types</span></h2>
-    <p style="font-size:11.5px;color:var(--muted);margin-bottom:16px">Customise the colour and label for each marker type. Changes apply to all pins, layer buttons, and the legend.</p>
+    <p style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Customize the color and label for each marker type. Types in use by locations cannot be deleted.</p>
     <div id="mt-list"></div>
+    <div style="margin-top:10px">
+      <button class="ctrl-btn" onclick="addMTRow()" style="font-size:12px">＋ Add Type</button>
+    </div>
     <div class="modal-actions" style="margin-top:14px">
       <button class="btn-c" onclick="closeMT()">Cancel</button>
       <button class="btn-s" onclick="saveMT()">Apply Changes</button>
