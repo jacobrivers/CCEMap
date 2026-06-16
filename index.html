@@ -44,26 +44,40 @@
 
   <div class="sep"></div>
   <span class="clabel">All Pins</span>
-  <div class="gpin-group">
-    <button class="gpin-btn active" data-shape="circle"  onclick="setAllIcons('circle')"  title="All pins: Circle">⬤</button>
-    <button class="gpin-btn"        data-shape="pin"     onclick="setAllIcons('pin')"     title="All pins: Pin">📍</button>
-    <button class="gpin-btn"        data-shape="star"    onclick="setAllIcons('star')"    title="All pins: Star">★</button>
-    <button class="gpin-btn"        data-shape="square"  onclick="setAllIcons('square')"  title="All pins: Square">■</button>
-    <button class="gpin-btn"        data-shape="diamond" onclick="setAllIcons('diamond')" title="All pins: Diamond">◆</button>
-    <button class="gpin-btn gpin-mixed" data-shape="mixed" title="Mixed (per-pin icons)">Mix</button>
+  <div class="dd-wrap" id="dd-pins">
+    <button class="dd-btn" id="pins-dd-btn" onclick="toggleDD('dd-pins',event)"><span id="pins-dd-sym">⬤</span> Pins ▾</button>
+    <div class="dd-menu">
+      <div class="dd-item" data-shape="circle"  onclick="setAllIcons('circle');closeDD('dd-pins')"><span class="dd-check" id="dc-circle">✓</span>⬤ Circle</div>
+      <div class="dd-item" data-shape="pin"     onclick="setAllIcons('pin');closeDD('dd-pins')"><span class="dd-check" id="dc-pin"></span>📍 Pin</div>
+      <div class="dd-item" data-shape="star"    onclick="setAllIcons('star');closeDD('dd-pins')"><span class="dd-check" id="dc-star"></span>★ Star</div>
+      <div class="dd-item" data-shape="square"  onclick="setAllIcons('square');closeDD('dd-pins')"><span class="dd-check" id="dc-square"></span>■ Square</div>
+      <div class="dd-item" data-shape="diamond" onclick="setAllIcons('diamond');closeDD('dd-pins')"><span class="dd-check" id="dc-diamond"></span>◆ Diamond</div>
+      <div class="dd-item" data-shape="mixed"   onclick="closeDD('dd-pins')"><span class="dd-check" id="dc-mixed"></span>∷ Mixed</div>
+    </div>
   </div>
 
   <div class="sep"></div>
   <button class="ctrl-btn" id="theme-btn"  onclick="toggleTheme()">🌙 Dark</button>
-  <button class="ctrl-btn" id="labels-btn" onclick="toggleLabels()">🗺️ Map Labels</button>
+  <div class="dd-wrap" id="dd-labels">
+    <button class="dd-btn" onclick="toggleDD('dd-labels',event)">🏷️ Labels ▾</button>
+    <div class="dd-menu">
+      <div class="dd-item" onclick="toggleLabels();event.stopPropagation()"><span class="dd-check" id="dlbl-map">✓</span>🗺️ Map Labels</div>
+      <div class="dd-item" onclick="togglePinLabels();event.stopPropagation()"><span class="dd-check" id="dlbl-pin">✓</span>📍 Pin Labels</div>
+    </div>
+  </div>
   <button class="ctrl-btn" id="list-btn"   onclick="togglePanel()">📋 List</button>
-  <button class="ctrl-btn" id="undo-btn"      onclick="undoDelete()" style="display:none">↩️ Undo</button>
-  <button class="ctrl-btn" id="pinlabels-btn" onclick="togglePinLabels()">📍 Pin Labels</button>
-  <button class="ctrl-btn" onclick="openPlatformMgr()">⚙️ Platforms</button>
-  <button class="ctrl-btn" onclick="openMT()">🎨 Marker Types</button>
-  <button class="ctrl-btn" onclick="reloadFromSource()" title="Reload data from source files">🔄 Sync</button>
-  <button class="ctrl-btn" onclick="exportSettings()" title="Export all settings as JSON">💾 Export</button>
-  <button class="ctrl-btn" onclick="importSettings()" title="Import settings JSON">📂 Import</button>
+  <button class="ctrl-btn" id="undo-btn"   onclick="undoDelete()" style="display:none">↩️ Undo</button>
+  <div class="dd-wrap" id="dd-settings">
+    <button class="dd-btn" onclick="toggleDD('dd-settings',event)">⚙️ Settings ▾</button>
+    <div class="dd-menu">
+      <div class="dd-item" onclick="openPlatformMgr();closeDD('dd-settings')"><span class="dd-check"></span>⚙️ Platforms</div>
+      <div class="dd-item" onclick="openMT();closeDD('dd-settings')"><span class="dd-check"></span>🎨 Marker Types</div>
+      <div class="dd-sep"></div>
+      <div class="dd-item" onclick="reloadFromSource();closeDD('dd-settings')"><span class="dd-check"></span>🔄 Sync</div>
+      <div class="dd-item" onclick="exportSettings();closeDD('dd-settings')"><span class="dd-check"></span>💾 Export</div>
+      <div class="dd-item" onclick="importSettings();closeDD('dd-settings')"><span class="dd-check"></span>📂 Import</div>
+    </div>
+  </div>
   <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)">
 
   <div class="spacer"></div>
@@ -81,10 +95,15 @@
       <span class="sp-count" id="sp-count">—</span>
       <button class="ctrl-btn" style="padding:2px 8px;font-size:11px;" onclick="openModal(null)">＋ Add</button>
     </div>
+    <div class="sp-tabs">
+      <button class="sp-tab active" data-view="table"      onclick="setLegendView('table')">Table</button>
+      <button class="sp-tab"        data-view="bytype"     onclick="setLegendView('bytype')">By Type</button>
+      <button class="sp-tab"        data-view="byplatform" onclick="setLegendView('byplatform')">By Platform</button>
+    </div>
     <div class="sp-search">
       <input type="text" id="sp-search" placeholder="Search name, city, state, region, country, platform…"/>
     </div>
-    <div class="sp-table-wrap">
+    <div class="sp-table-wrap" id="sp-table-wrap">
       <table>
         <thead>
           <tr>
@@ -98,6 +117,7 @@
         <tbody id="sp-tbody"></tbody>
       </table>
     </div>
+    <div class="leg-view" id="leg-view" style="display:none"></div>
   </div>
 </div>
 

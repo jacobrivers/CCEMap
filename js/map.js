@@ -153,10 +153,7 @@ function initMap() {
   });
 
   document.getElementById('theme-btn').textContent  = isDark   ? '🌙 Dark' : '☀️ Light';
-  document.getElementById('labels-btn').textContent = labelsOn ? '🗺️ Map Labels' : '🗺️ No Map Labels';
-  if (!labelsOn) document.getElementById('labels-btn').classList.add('active');
-  document.getElementById('pinlabels-btn').classList.toggle('active', !pinLabelsOn);
-  document.getElementById('pinlabels-btn').textContent = pinLabelsOn ? '📍 Pin Labels' : '📍 Labels Off';
+  syncLabelsDD();
 
   map.on('zoomend moveend', scheduleResolveOverlaps);
 
@@ -207,10 +204,14 @@ function toggleTheme() {
 }
 function toggleLabels() {
   labelsOn = !labelsOn;
-  const btn = document.getElementById('labels-btn');
-  btn.textContent = labelsOn ? '🗺️ Map Labels' : '🗺️ No Map Labels';
-  btn.classList.toggle('active', !labelsOn);
+  syncLabelsDD();
   applyTiles(); persist();
+}
+function syncLabelsDD() {
+  const mapChk = document.getElementById('dlbl-map');
+  const pinChk = document.getElementById('dlbl-pin');
+  if (mapChk) mapChk.textContent = labelsOn    ? '✓' : '';
+  if (pinChk) pinChk.textContent = pinLabelsOn ? '✓' : '';
 }
 
 // ─── Icon builder ─────────────────────────────────────────────────────────────
@@ -372,10 +373,18 @@ function setAllIcons(shape) {
   });
   persist(); renderTable(); syncGpinBtn();
 }
+const SHAPE_SYM = { circle:'⬤', pin:'📍', star:'★', square:'■', diamond:'◆', mixed:'∷' };
 function syncGpinBtn() {
   const shapes = [...new Set(locations.map(l => l.icon||'circle'))];
   const active = shapes.length===1 ? shapes[0] : 'mixed';
-  document.querySelectorAll('.gpin-btn').forEach(b => b.classList.toggle('active', b.dataset.shape===active));
+  // Update dropdown button label
+  const sym = document.getElementById('pins-dd-sym');
+  if (sym) sym.textContent = SHAPE_SYM[active] || '⬤';
+  // Update dropdown item checkmarks
+  ['circle','pin','star','square','diamond','mixed'].forEach(s => {
+    const el = document.getElementById('dc-' + s);
+    if (el) el.textContent = (s === active) ? '✓' : '';
+  });
 }
 
 // ─── Platform filter modal ────────────────────────────────────────────────────
@@ -431,6 +440,102 @@ function undoDelete() {
   map.flyTo([loc.lat,loc.lng], Math.max(map.getZoom(),4), {duration:1});
 }
 
+// ─── Dropdown management ──────────────────────────────────────────────────────
+let openDdId = null;
+function toggleDD(id, e) {
+  e && e.stopPropagation();
+  if (openDdId && openDdId !== id) closeDD(openDdId);
+  const el = document.getElementById(id);
+  el.classList.toggle('open');
+  openDdId = el.classList.contains('open') ? id : null;
+}
+function closeDD(id) {
+  const el = document.getElementById(id);
+  if (el) el.classList.remove('open');
+  if (openDdId === id) openDdId = null;
+}
+document.addEventListener('click', () => { if (openDdId) closeDD(openDdId); });
+
+// ─── Side panel tabs & legend views ──────────────────────────────────────────
+let legendView = 'table';
+function setLegendView(v) {
+  legendView = v;
+  document.querySelectorAll('.sp-tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
+  const tw   = document.getElementById('sp-table-wrap');
+  const lv   = document.getElementById('leg-view');
+  const srch = document.querySelector('.sp-search');
+  if (v === 'table') {
+    if (tw)   tw.style.display   = '';
+    if (lv)   lv.style.display   = 'none';
+    if (srch) srch.style.display = '';
+  } else {
+    if (tw)   tw.style.display   = 'none';
+    if (lv)   lv.style.display   = '';
+    if (srch) srch.style.display = 'none';
+  }
+  renderTable();
+}
+
+function renderByType() {
+  const lv = document.getElementById('leg-view'); if (!lv) return;
+  const groups = {};
+  locations.filter(l => isVisible(l)).forEach(l => {
+    if (!groups[l.type]) groups[l.type] = [];
+    groups[l.type].push(l);
+  });
+  let html = '';
+  Object.entries(typeConfig).forEach(([key, cfg]) => {
+    const locs = groups[key] || [];
+    if (!locs.length) return;
+    locs.sort((a, b) => a.name.localeCompare(b.name));
+    html += `<div class="leg-section">
+      <div class="leg-s-hdr"><span>${cfg.label}</span><span class="leg-count">${locs.length}</span></div>`;
+    locs.forEach(loc => {
+      html += `<div class="leg-item" onclick="flyTo('${loc.id}')">
+        <div class="leg-dot" style="background:${cfg.color}"></div>
+        <span>${loc.name}</span>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  if (!html) html = '<div style="padding:12px;font-size:12px;color:var(--muted)">No visible locations.</div>';
+  lv.innerHTML = html;
+}
+
+function renderByPlatform() {
+  const lv = document.getElementById('leg-view'); if (!lv) return;
+  const groups = {};
+  locations.filter(l => isVisible(l)).forEach(l => {
+    (l.platforms || []).forEach(p => {
+      if (!groups[p]) groups[p] = [];
+      groups[p].push(l);
+    });
+    if (!(l.platforms || []).length) {
+      const k = '(none)';
+      if (!groups[k]) groups[k] = [];
+      groups[k].push(l);
+    }
+  });
+  const sortedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
+  let html = '';
+  sortedKeys.forEach(plat => {
+    const locs = groups[plat];
+    locs.sort((a, b) => a.name.localeCompare(b.name));
+    html += `<div class="leg-section">
+      <div class="leg-s-hdr"><span>${plat}</span><span class="leg-count">${locs.length}</span></div>`;
+    locs.forEach(loc => {
+      const tc = typeConfig[loc.type] || DEFAULT_TYPE_CFG[loc.type];
+      html += `<div class="leg-item" onclick="flyTo('${loc.id}')">
+        <div class="leg-dot" style="background:${tc.color}"></div>
+        <span>${loc.name}</span>
+      </div>`;
+    });
+    html += '</div>';
+  });
+  if (!html) html = '<div style="padding:12px;font-size:12px;color:var(--muted)">No visible locations.</div>';
+  lv.innerHTML = html;
+}
+
 // ─── Side panel / table ───────────────────────────────────────────────────────
 function togglePanel() {
   panelOpen = !panelOpen;
@@ -447,6 +552,8 @@ function sortBy(key) {
 }
 function renderTable() {
   if (!panelOpen) return;
+  if (legendView === 'bytype')     { renderByType();     return; }
+  if (legendView === 'byplatform') { renderByPlatform(); return; }
   const q = (document.getElementById('sp-search').value||'').toLowerCase();
   let rows = locations.filter(l => !q || [l.name,l.city,l.state,l.country,l.region,...(l.platforms||[])].join(' ').toLowerCase().includes(q));
   rows.sort((a,b) => (a[sortKey]||'').localeCompare(b[sortKey]||'')*sortDir);
@@ -676,19 +783,17 @@ function saveMT() {
 }
 
 // ─── Pin Labels ───────────────────────────────────────────────────────────────
-// Offset pushes tooltip tip past the icon edge (iconAnchor is often center; +18px clears a 24px icon)
-const LABEL_OFFSET = {bottom:[0,18], top:[0,-18], right:[18,0], left:[-18,0]};
+// Small offset keeps label almost touching the pin edge.
+const LABEL_OFFSET = {bottom:[0,6], top:[0,-6], right:[6,0], left:[-6,0]};
 function attachPinLabel(loc, m, dir='bottom') {
   const text = loc.label || loc.name;
   m.bindTooltip(text, { permanent:true, direction:dir, className:'map-label', interactive:false,
-    pane:'pinLabelPane', offset: LABEL_OFFSET[dir]||[0,18] });
+    pane:'pinLabelPane', offset: LABEL_OFFSET[dir]||[0,6] });
 }
 
 function togglePinLabels() {
   pinLabelsOn = !pinLabelsOn;
-  const btn = document.getElementById('pinlabels-btn');
-  btn.classList.toggle('active', !pinLabelsOn);
-  btn.textContent = pinLabelsOn ? '📍 Pin Labels' : '📍 Labels Off';
+  syncLabelsDD();
   refreshAllPinLabels(); persist();
 }
 
@@ -708,7 +813,7 @@ function scheduleResolveOverlaps() {
 }
 
 function estimateLabelRect(px, dir, text) {
-  const w = Math.max(48, text.length * 6.5) + 14, h = 20, GAP = 15;
+  const w = Math.max(48, text.length * 6.5) + 14, h = 20, GAP = 8;
   let x, y;
   switch(dir) {
     case 'bottom': x=px.x-w/2; y=px.y+GAP; break;
@@ -781,8 +886,9 @@ function handleImportFile(e) {
       locations=d.locations; platforms=d.platforms;
       if(d.typeConfig) typeConfig=d.typeConfig;
       if(d.theme!==undefined){ isDark=d.theme==='dark'; document.body.className=isDark?'dark':'light'; document.getElementById('theme-btn').textContent=isDark?'🌙 Dark':'☀️ Light'; }
-      if(d.labels!==undefined){ labelsOn=d.labels; document.getElementById('labels-btn').textContent=labelsOn?'🗺️ Map Labels':'🗺️ No Map Labels'; document.getElementById('labels-btn').classList.toggle('active',!labelsOn); }
-      if(d.pinLabels!==undefined){ pinLabelsOn=d.pinLabels; const pb=document.getElementById('pinlabels-btn'); pb.classList.toggle('active',!pinLabelsOn); pb.textContent=pinLabelsOn?'📍 Pin Labels':'📍 Labels Off'; }
+      if(d.labels!==undefined){ labelsOn=d.labels; }
+      if(d.pinLabels!==undefined){ pinLabelsOn=d.pinLabels; }
+      syncLabelsDD();
       persist(); renderAll(); refreshLayerButtons(); refreshLegend(); applyTiles();
       showToast('Settings imported ✓');
     } catch(err){ alert('Import failed: '+err.message); }
