@@ -429,6 +429,8 @@ const DEFAULT_TYPE_CFG = {
   sovvoice:     { color: '#f97316', label: 'SOV Voice' },
   fedrampvoice: { color: '#e879f9', label: 'FedRamp Voice' },
 };
+// Canonical filenames — must match data/*.json files on GitHub exactly
+const TYPE_FILES = ['appstack','voicepop','sovregion','fedramp','sovvoice','fedrampvoice'];
 const US_STATES = [
   'Alabama','Alaska','Arizona','Arkansas','California','Colorado','Connecticut','Delaware',
   'Florida','Georgia','Hawaii','Idaho','Illinois','Indiana','Iowa','Kansas','Kentucky',
@@ -1340,16 +1342,14 @@ function resetToDefaults(){
 function dlJSON(filename,data){ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'}); const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=filename; a.click(); setTimeout(()=>URL.revokeObjectURL(a.href),1000) }
 
 function exportTypeFiles() {
-  const typeKeys = Object.keys(typeConfig);
+  // Always use TYPE_FILES so exported filenames match GitHub data/ folder exactly
   let delay = 0;
-  typeKeys.forEach(typeKey => {
+  TYPE_FILES.forEach(typeKey => {
     const entries = locations.filter(l => l.type === typeKey);
-    setTimeout(() => {
-      dlJSON(typeKey + '.json', entries);
-    }, delay);
+    setTimeout(() => dlJSON(typeKey + '.json', entries), delay);
     delay += 300;
   });
-  showToast(`Exporting ${typeKeys.length} data files — check your downloads folder.`);
+  showToast(`Exporting ${TYPE_FILES.length} data files — filenames match your GitHub data/ folder.`);
 }
 
 // ── Persist to localStorage ────────────────────────────────────────────────────

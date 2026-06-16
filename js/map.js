@@ -1064,16 +1064,14 @@ function dlJSON(filename, data) {
 }
 
 function exportTypeFiles() {
-  const typeKeys = Object.keys(typeConfig);
+  // Always use TYPE_FILES so exported filenames match GitHub data/ folder exactly
   let delay = 0;
-  typeKeys.forEach(typeKey => {
+  TYPE_FILES.forEach(typeKey => {
     const entries = locations.filter(l => l.type === typeKey);
-    setTimeout(() => {
-      dlJSON(typeKey + '.json', entries);
-    }, delay);
+    setTimeout(() => dlJSON(typeKey + '.json', entries), delay);
     delay += 300;
   });
-  showToast(`Exporting ${typeKeys.length} data files — check your downloads folder.`);
+  showToast(`Exporting ${TYPE_FILES.length} data files — filenames match your GitHub data/ folder.`);
 }
 
 // ─── Persist to localStorage ──────────────────────────────────────────────────
