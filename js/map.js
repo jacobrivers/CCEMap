@@ -132,6 +132,10 @@ function showLoadingError(dataSource, base) {
 // ─── Map init ─────────────────────────────────────────────────────────────────
 function initMap() {
   map = L.map('map', { center:[20,10], zoom:2, minZoom:2 });
+  // Custom pane: pin labels always render above markers (markerPane = 600)
+  map.createPane('pinLabelPane');
+  map.getPane('pinLabelPane').style.zIndex = 700;
+  map.getPane('pinLabelPane').style.pointerEvents = 'none';
   applyTiles();
 
   const leg = L.control({ position:'bottomright' });
@@ -147,7 +151,7 @@ function initMap() {
   });
 
   document.getElementById('theme-btn').textContent  = isDark   ? '🌙 Dark' : '☀️ Light';
-  document.getElementById('labels-btn').textContent = labelsOn ? '🏷️ Labels' : '🏷️ No Labels';
+  document.getElementById('labels-btn').textContent = labelsOn ? '🗺️ Map Labels' : '🗺️ No Map Labels';
   if (!labelsOn) document.getElementById('labels-btn').classList.add('active');
   document.getElementById('pinlabels-btn').classList.toggle('active', !pinLabelsOn);
   document.getElementById('pinlabels-btn').textContent = pinLabelsOn ? '📍 Pin Labels' : '📍 Labels Off';
@@ -198,7 +202,7 @@ function toggleTheme() {
 function toggleLabels() {
   labelsOn = !labelsOn;
   const btn = document.getElementById('labels-btn');
-  btn.textContent = labelsOn ? '🏷️ Labels' : '🏷️ No Labels';
+  btn.textContent = labelsOn ? '🗺️ Map Labels' : '🗺️ No Map Labels';
   btn.classList.toggle('active', !labelsOn);
   applyTiles(); persist();
 }
@@ -644,9 +648,12 @@ function saveMT() {
 }
 
 // ─── Pin Labels ───────────────────────────────────────────────────────────────
-function attachPinLabel(loc, m) {
+// Offset pushes tooltip tip past the icon edge (iconAnchor is often center; +18px clears a 24px icon)
+const LABEL_OFFSET = {bottom:[0,18], top:[0,-18], right:[18,0], left:[-18,0]};
+function attachPinLabel(loc, m, dir='bottom') {
   const text = loc.label || loc.name;
-  m.bindTooltip(text, { permanent:true, direction:'bottom', className:'map-label', interactive:false });
+  m.bindTooltip(text, { permanent:true, direction:dir, className:'map-label', interactive:false,
+    pane:'pinLabelPane', offset: LABEL_OFFSET[dir]||[0,18] });
 }
 
 function togglePinLabels() {
@@ -662,7 +669,7 @@ function refreshAllPinLabels() {
     const m = markerMap[loc.id]; if (!m) return;
     m.unbindTooltip();
     if (loc.labelOn && pinLabelsOn && isVisible(loc) && map.hasLayer(m))
-      attachPinLabel(loc, m);
+      attachPinLabel(loc, m, loc._labelDir||'bottom');
   });
   scheduleResolveOverlaps();
 }
@@ -713,8 +720,10 @@ function resolveLabelOverlaps() {
     placedLabelRects.push(estimateLabelRect(px, bestDir, text));
     const tt = m.getTooltip();
     if (!tt || tt.options.direction !== bestDir) {
+      loc._labelDir = bestDir;
       m.unbindTooltip();
-      m.bindTooltip(text, { permanent:true, direction:bestDir, className:'map-label', interactive:false });
+      m.bindTooltip(text, { permanent:true, direction:bestDir, className:'map-label', interactive:false,
+        pane:'pinLabelPane', offset: LABEL_OFFSET[bestDir]||[0,18] });
     }
   });
 }
@@ -744,7 +753,7 @@ function handleImportFile(e) {
       locations=d.locations; platforms=d.platforms;
       if(d.typeConfig) typeConfig=d.typeConfig;
       if(d.theme!==undefined){ isDark=d.theme==='dark'; document.body.className=isDark?'dark':'light'; document.getElementById('theme-btn').textContent=isDark?'🌙 Dark':'☀️ Light'; }
-      if(d.labels!==undefined){ labelsOn=d.labels; document.getElementById('labels-btn').textContent=labelsOn?'🏷️ Labels':'🏷️ No Labels'; document.getElementById('labels-btn').classList.toggle('active',!labelsOn); }
+      if(d.labels!==undefined){ labelsOn=d.labels; document.getElementById('labels-btn').textContent=labelsOn?'🗺️ Map Labels':'🗺️ No Map Labels'; document.getElementById('labels-btn').classList.toggle('active',!labelsOn); }
       if(d.pinLabels!==undefined){ pinLabelsOn=d.pinLabels; const pb=document.getElementById('pinlabels-btn'); pb.classList.toggle('active',!pinLabelsOn); pb.textContent=pinLabelsOn?'📍 Pin Labels':'📍 Labels Off'; }
       persist(); renderAll(); refreshLayerButtons(); refreshLegend(); applyTiles();
       showToast('Settings imported ✓');
