@@ -258,7 +258,7 @@ function cityLine(loc) {
   return [cityState, loc.country, loc.region].filter(Boolean).join(' · ');
 }
 function popupHTML(loc) {
-  const tags  = (loc.platforms||[]).map(tagHTML).join('');
+  const tags  = loc.platform ? tagHTML(loc.platform) : '';
   const icons = Object.keys(ICON_EM).map(k =>
     `<div class="ipick ${loc.icon===k?'sel':''}" onclick="chIcon('${loc.id}','${k}')" title="${k}">${ICON_EM[k]}</div>`
   ).join('');
@@ -284,7 +284,7 @@ function chIcon(id, shape) {
 function isVisible(loc) {
   if (!layerOn[loc.type]) return false;
   if (platformFilter.size === 0) return true;
-  return (loc.platforms||[]).some(p => platformFilter.has(p));
+  return platformFilter.has(loc.platform);
 }
 function applyAllVisibility() {
   locations.forEach(loc => {
@@ -409,7 +409,7 @@ function buildPFModalGrid() {
 function pfSelectAll() { platforms.forEach(p => pfTemp.add(p.name)); buildPFModalGrid(); updatePFMatchCount(); }
 function pfClearAll()  { pfTemp.clear(); buildPFModalGrid(); updatePFMatchCount(); }
 function updatePFMatchCount() {
-  const n = pfTemp.size===0 ? locations.length : locations.filter(l=>(l.platforms||[]).some(p=>pfTemp.has(p))).length;
+  const n = pfTemp.size===0 ? locations.length : locations.filter(l=>pfTemp.has(l.platform)).length;
   document.getElementById('pf-match-count').textContent = pfTemp.size===0 ? 'Showing all pins' : `Matches: ${n} pin${n!==1?'s':''}`;
 }
 function applyPFModal() {
@@ -506,15 +506,9 @@ function renderByPlatform() {
   const lv = document.getElementById('leg-view'); if (!lv) return;
   const groups = {};
   locations.filter(l => isVisible(l)).forEach(l => {
-    (l.platforms || []).forEach(p => {
-      if (!groups[p]) groups[p] = [];
-      groups[p].push(l);
-    });
-    if (!(l.platforms || []).length) {
-      const k = '(none)';
-      if (!groups[k]) groups[k] = [];
-      groups[k].push(l);
-    }
+    const p = l.platform || '(none)';
+    if (!groups[p]) groups[p] = [];
+    groups[p].push(l);
   });
   const sortedKeys = Object.keys(groups).sort((a, b) => a.localeCompare(b));
   let html = '';
@@ -555,17 +549,17 @@ function renderTable() {
   if (legendView === 'bytype')     { renderByType();     return; }
   if (legendView === 'byplatform') { renderByPlatform(); return; }
   const q = (document.getElementById('sp-search').value||'').toLowerCase();
-  let rows = locations.filter(l => !q || [l.name,l.city,l.state,l.country,l.region,...(l.platforms||[])].join(' ').toLowerCase().includes(q));
+  let rows = locations.filter(l => !q || [l.name,l.city,l.state,l.country,l.region,l.platform||''].join(' ').toLowerCase().includes(q));
   rows.sort((a,b) => (a[sortKey]||'').localeCompare(b[sortKey]||'')*sortDir);
   const tbody = document.getElementById('sp-tbody'); tbody.innerHTML = '';
   rows.forEach(loc => {
-    const tags = (loc.platforms||[]).map(tagHTML).join('');
+    const tags = loc.platform ? tagHTML(loc.platform) : (()=>{const c=typeConfig[loc.type]||DEFAULT_TYPE_CFG[loc.type];return tagHTML(c.label)})();
     const locDisp = [loc.state, loc.country].filter(Boolean).join(', ') || '—';
     const tr = document.createElement('tr');
     tr.innerHTML = `<td class="nc" title="${loc.name}">${loc.name}</td>
       <td class="dim" title="${loc.region||''}">${loc.region||'—'}</td>
       <td class="dim" title="${locDisp}">${locDisp}</td>
-      <td><div class="tags">${tags||(()=>{const c=typeConfig[loc.type]||DEFAULT_TYPE_CFG[loc.type];return tagHTML(c.label)})()}</div></td>
+      <td><div class="tags">${tags}</div></td>
       <td><div class="row-actions">
         <button class="act-btn fly"  title="Fly to" onclick="flyTo('${loc.id}')">🎯</button>
         <button class="act-btn edit" title="Edit"   onclick="openModal('${loc.id}')">✏️</button>
@@ -603,17 +597,6 @@ function buildTypeSelect(selected) {
   ).join('');
 }
 
-function buildModalPlatGrid(selected) {
-  const g = document.getElementById('m-plat-grid'); g.innerHTML = '';
-  platforms.forEach(p => {
-    const lbl = document.createElement('label'); lbl.className='plat-opt';
-    const chk = document.createElement('input'); chk.type='checkbox'; chk.value=p.name;
-    chk.checked = selected && selected.includes(p.name); chk.setAttribute('data-plat','1');
-    lbl.appendChild(chk); lbl.appendChild(document.createTextNode(' '+p.name)); g.appendChild(lbl);
-  });
-}
-function getSelectedPlats() { return Array.from(document.querySelectorAll('[data-plat]:checked')).map(e=>e.value); }
-
 function openModal(id) {
   editingId = id;
   const loc = id ? locations.find(l=>l.id===id) : null;
@@ -627,7 +610,9 @@ function openModal(id) {
   document.getElementById('m-lng').value     = loc?.lng     || '';
   document.getElementById('m-label').value      = loc?.label   || '';
   document.getElementById('m-label-on').checked = loc?.labelOn || false;
-  buildModalPlatGrid(loc?.platforms||[]);
+  const mPlat = document.getElementById('m-plat');
+  mPlat.innerHTML = '<option value="">— Select platform —</option>' + platforms.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
+  mPlat.value = loc?.platform || '';
   buildTypeSelect(loc?.type||'cxone');
   selIcon(loc?.icon||'circle');
   checkUSState();
@@ -708,7 +693,7 @@ function saveModal() {
     state: isUSA(country) ? document.getElementById('m-state').value : '',
     country, region:document.getElementById('m-region').value,
     type:document.getElementById('m-type').value,
-    platforms:getSelectedPlats(), icon:selIconVal, lat, lng,
+    platform:document.getElementById('m-plat').value, icon:selIconVal, lat, lng,
     label:   document.getElementById('m-label').value.trim(),
     labelOn: document.getElementById('m-label-on').checked,
   };
@@ -739,13 +724,15 @@ function closePM() { document.getElementById('pm-overlay').classList.remove('ope
 function renderPMList() {
   const list=document.getElementById('pm-list'); list.innerHTML='';
   pmWorking.forEach((p,i) => {
+    const cnt = locations.filter(l=>l.platform===p.name).length;
     const row=document.createElement('div'); row.className='pm-row';
     const sw=document.createElement('div'); sw.className='pm-swatch'; sw.style.background=PLAT_COLORS[i%PLAT_COLORS.length];
     const inp=document.createElement('input'); inp.className='pm-name-inp'; inp.value=p.name;
     inp.onchange=()=>{pmWorking[i].name=inp.value.trim()};
+    const cntEl=document.createElement('span'); cntEl.style.cssText='font-size:10px;color:var(--muted);white-space:nowrap'; cntEl.textContent=`${cnt} loc`;
     const del=document.createElement('button'); del.className='pm-del-btn'; del.textContent='✕';
     del.onclick=()=>{if(confirm(`Remove platform "${p.name}"?`)){pmWorking.splice(i,1);renderPMList()}};
-    row.appendChild(sw); row.appendChild(inp); row.appendChild(del); list.appendChild(row);
+    row.appendChild(sw); row.appendChild(inp); row.appendChild(cntEl); row.appendChild(del); list.appendChild(row);
   });
 }
 function addPlatform() {
@@ -872,6 +859,27 @@ function exportSettings() {
     labels: labelsOn,
     pinLabels: pinLabelsOn,
   });
+}
+
+function replaceConstBlock(html, constName, replacement){
+  const marker = 'const ' + constName + ' = ';
+  const start = html.indexOf(marker);
+  if(start === -1) return html;
+  let i = start + marker.length, depth = 0, inStr = false, strChar = '';
+  for(; i < html.length; i++){
+    const c = html[i];
+    if(inStr){ if(c==='\\'){i++;continue;} if(c===strChar) inStr=false; }
+    else {
+      if(c==='"'||c==="'"||c==='`'){ inStr=true; strChar=c; }
+      else if(c==='{'||c==='[') depth++;
+      else if(c==='}'||c===']'){ depth--; if(depth===0){i++;break;} }
+    }
+  }
+  if(html[i]===';') i++;
+  return html.slice(0,start) + replacement + html.slice(i);
+}
+function exportSourceFile(){
+  alert('Export Source File is only available in the Standalone version. Open nice-cxone-map-standalone.html instead.');
 }
 
 function importSettings() { document.getElementById('import-file').click(); }

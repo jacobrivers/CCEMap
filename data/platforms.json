@@ -1,7 +1,26 @@
 [
-  {"id":"p_cxone",  "name":"CXone Software"},
-  {"id":"p_cog",    "name":"Cognigy AI"},
-  {"id":"p_voice",  "name":"Voice POP"},
-  {"id":"p_sov",    "name":"SOV Region"},
-  {"id":"p_pstn",     "name":"pstn Carrier"}
+  {
+    "id": "p_cxone",
+    "name": "CXone Software"
+  },
+  {
+    "id": "p_cog",
+    "name": "Cognigy AI"
+  },
+  {
+    "id": "p_voice",
+    "name": "Voice POP"
+  },
+  {
+    "id": "p_pstn",
+    "name": "PSTN Carrier"
+  },
+  {
+    "id": "p_fedramp",
+    "name": "FedRamp Region"
+  },
+  {
+    "id": "p_sov",
+    "name": "SOV Region"
+  }
 ]

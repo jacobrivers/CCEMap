@@ -76,11 +76,14 @@
       <div class="dd-item" onclick="reloadFromSource();closeDD('dd-settings')"><span class="dd-check"></span>🔄 Sync</div>
       <div class="dd-item" onclick="exportSettings();closeDD('dd-settings')"><span class="dd-check"></span>💾 Export</div>
       <div class="dd-item" onclick="importSettings();closeDD('dd-settings')"><span class="dd-check"></span>📂 Import</div>
+      <div class="dd-sep"></div>
+      <div class="dd-item" onclick="exportSourceFile();closeDD('dd-settings')"><span class="dd-check"></span>📦 Export Source File</div>
     </div>
   </div>
   <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)">
 
   <div class="spacer"></div>
+  <button class="ctrl-btn" onclick="openPlatformMgr()" title="Add, remove, or rename platforms/services" style="flex-shrink:0">⚙️ Platforms</button>
   <button class="add-btn" onclick="openModal(null)">＋ Add Location</button>
 </div>
 
@@ -146,7 +149,9 @@
       <label>State</label>
       <select id="m-state"><option value="">— Select State —</option></select>
     </div>
-    <div class="fg"><label>Platforms / Services</label><div class="plat-grid" id="m-plat-grid"></div></div>
+    <div class="fg"><label>Platform / Service</label>
+      <select id="m-plat" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--badge);color:var(--fg);font-size:12px"></select>
+    </div>
     <div class="fg"><label>Marker Colour</label>
       <select id="m-type"></select>
     </div>

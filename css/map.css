@@ -260,15 +260,6 @@ td.dim { color: var(--muted); max-width: 85px; white-space: nowrap; overflow: hi
 .frow { display: flex; gap: 9px; }
 .frow .fg { flex: 1; }
 
-/* Platform checkbox grid (location modal) */
-.plat-grid { display: flex; flex-wrap: wrap; gap: 5px; }
-.plat-opt {
-  display: flex; align-items: center; gap: 5px; font-size: 11.5px;
-  cursor: pointer; padding: 4px 9px; border-radius: 6px;
-  border: 1.5px solid var(--border); background: var(--badge); transition: all .12s;
-}
-.plat-opt:has(input:checked) { border-color: var(--nice-pink); color: var(--nice-pink); background: rgba(232,23,93,.08); }
-.plat-opt input { accent-color: var(--nice-pink); }
 
 /* Icon picker (location modal) */
 .icon-picker-row { display: flex; gap: 6px; }
