@@ -53,12 +53,20 @@ async function boot() {
 
   setLoadMsg('Loading marker types…');
   const netTypes = await fetchJSON('data/marker-types.json');
-  const lsTypes = tryParse(localStorage.getItem('nice_typecfg'), null);
-  if (lsTypes && Object.keys(lsTypes).length) {
-    typeConfig = lsTypes;
-  } else if (Array.isArray(netTypes)) {
-    typeConfig = {};
+  // Always seed from file first so we always have valid defaults
+  if (Array.isArray(netTypes)) {
     netTypes.forEach(t => { typeConfig[t.key] = { color: t.color, label: t.label }; });
+  }
+  // Then overlay localStorage (handles both array and object formats)
+  const lsTypes = tryParse(localStorage.getItem('nice_typecfg'), null);
+  if (lsTypes) {
+    if (Array.isArray(lsTypes)) {
+      // Old format: [{key, color, label}, ...]
+      lsTypes.forEach(t => { if(t && t.key) typeConfig[t.key] = { color: t.color||'#2B8EFF', label: t.label||t.key }; });
+    } else if (typeof lsTypes === 'object') {
+      // New format: {key: {color, label}}
+      Object.entries(lsTypes).forEach(([k,v]) => { if(k && v && v.color) typeConfig[k] = v; });
+    }
   }
 
   setLoadMsg('Loading platform data…');
@@ -184,7 +192,7 @@ function togglePinLabels() { pinLabelsOn = !pinLabelsOn; refreshAllPinLabels(); 
 
 // ─── Icons & Markers ──────────────────────────────────────────────────────────
 function buildIcon(type, shape, offsetIdx=0) {
-  const cfg = typeConfig[type] || {}; const color = cfg.color||'#888'; const o = offsetIdx*5;
+  const cfg = typeConfig[type] || {}; const color = cfg.color||'#2B8EFF'; const o = offsetIdx*5;
   const S = {
     circle:  `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
     pin:     `<div style="font-size:18px;line-height:1;color:${color}">📍</div>`,
@@ -293,15 +301,39 @@ function renderLayerButtons() {
     const plat = platforms.find(p=>p.slug===slug);
     const name = plat ? plat.name : unslugify(slug);
     const typesHere = locations.filter(l=>slugify(l.platform)===slug).map(l=>l.type);
+    // Most frequent type drives the button color
     const modeType = typesHere.length ? [...typesHere].sort((a,b)=>typesHere.filter(t=>t===b).length-typesHere.filter(t=>t===a).length)[0] : '';
-    const color = (typeConfig[modeType]||{}).color||'#888';
+    const color = (typeConfig[modeType]||{}).color||'#2B8EFF';
     const btn = document.createElement('button');
     btn.className='layer-btn active'; btn.dataset.layer=slug;
     btn.style.color=color; btn.style.borderColor=color;
-    btn.innerHTML=`<span class="dot" style="background:${color}"></span>${name} <span class="cnt" id="cnt-${slug}">—</span>`;
+    // Clickable dot opens color picker; button text toggles layer
+    btn.innerHTML=`<span class="layer-color-dot" data-type="${modeType}" data-slug="${slug}" style="background:${color}" title="Click dot to change color" onclick="event.stopPropagation();pickLayerColor('${slug}','${modeType}',this)"></span>${name} <span class="cnt" id="cnt-${slug}">—</span>`;
     btn.onclick=()=>toggleLayer(slug);
     cont.appendChild(btn);
   });
+}
+
+function pickLayerColor(slug, type, dotEl) {
+  if (!type) { showToast('No marker type assigned to this platform yet'); return; }
+  const input = document.createElement('input');
+  input.type = 'color';
+  input.value = (typeConfig[type]||{}).color || '#2B8EFF';
+  input.style.cssText = 'position:fixed;top:-100px;left:-100px;opacity:0;width:0;height:0';
+  document.body.appendChild(input);
+  input.addEventListener('input', () => {
+    const c = input.value;
+    if (!typeConfig[type]) typeConfig[type] = { color: c, label: type };
+    else typeConfig[type].color = c;
+    dotEl.style.background = c;
+    const btn = dotEl.closest('.layer-btn');
+    if (btn) { btn.style.color = c; btn.style.borderColor = c; }
+    // Refresh all markers of this type live
+    locations.filter(l=>l.type===type).forEach(l=>{ const m=markerMap[l.id]; if(m) m.setIcon(buildIcon(l.type,l.icon||'circle',coordOffsets[l.id]||0)); });
+  });
+  input.addEventListener('change', () => { persist(); document.body.removeChild(input); showToast('Color updated ✓'); });
+  input.addEventListener('blur', () => { try{document.body.removeChild(input);}catch{} });
+  input.click();
 }
 function toggleLayer(slug) {
   if (slug==='all') {
@@ -374,6 +406,7 @@ function setDrawMode(mode) {
   document.querySelectorAll('.dm-btn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===(mode||'')));
   ['map-draw-line','map-draw-curve','map-draw-text'].forEach(c=>document.body.classList.remove(c));
   if(mode) document.body.classList.add('map-draw-'+mode);
+  const drawBtn=document.getElementById('draw-mode-btn'); if(drawBtn) drawBtn.classList.toggle('active',!!mode);
   const hint=document.getElementById('draw-hint');
   if(hint){
     const msgs={line:'Click to add points → double-click to finish line',curve:'Click start → click end (curve auto-calculated)',text:'Click anywhere to place a text label'};

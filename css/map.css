@@ -246,16 +246,19 @@ body.light .draw-text-inner{background:rgba(255,255,255,.9);color:#1e293b;border
 .hdr-btn:hover{background:var(--ctrl-hover)}
 .hdr-btn.active{border-color:var(--nice-blue);color:var(--nice-blue)}
 
-#ctrl-bar{position:fixed;top:48px;left:0;right:0;z-index:1090;background:var(--panel);border-bottom:1px solid var(--border);display:flex;align-items:center;flex-wrap:wrap;gap:4px;padding:5px 10px;min-height:42px}
-.layer-btns-row{display:flex;gap:4px;flex-wrap:nowrap;overflow-x:auto}
+#ctrl-bar{position:fixed;top:48px;left:0;right:0;z-index:1090;background:var(--panel);border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:0;padding:0}
+.ctrl-row{display:flex;align-items:center;flex-wrap:nowrap;gap:4px;padding:4px 10px;overflow-x:auto}
+.ctrl-layers-row{border-bottom:1px solid var(--border);min-height:34px}
+.ctrl-actions-row{min-height:34px}
+.layer-btns-row{display:flex;gap:4px;flex-wrap:nowrap}
 .ctrl-sep{width:1px;height:22px;background:var(--border);margin:0 2px;flex-shrink:0}
 .cust-btn{background:#10b981;border:none;color:#fff;border-radius:6px;padding:4px 12px;font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:opacity .15s}
 .cust-btn:hover{opacity:.85}
 .badge{background:var(--nice-blue);color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700}
-.draw-hint{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:2000;background:rgba(0,0,0,.78);color:#fff;padding:6px 14px;border-radius:20px;font-size:11px;pointer-events:none;white-space:nowrap}
+.draw-hint{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:2000;background:rgba(15,15,30,.88);color:#fff;padding:7px 16px;border-radius:20px;font-size:12px;pointer-events:none;white-space:nowrap;border:1px solid rgba(255,255,255,.15);box-shadow:0 2px 12px rgba(0,0,0,.4)}
 .dd-divider{height:1px;background:var(--border);margin:4px 0}
 
-#app-body{position:fixed;top:90px;left:0;right:0;bottom:0;display:flex;overflow:hidden}
+#app-body{position:fixed;top:122px;left:0;right:0;bottom:0;display:flex;overflow:hidden}
 #map{flex:1;z-index:1;min-width:0}
 
 /* Left panel scroll & footer */
@@ -312,6 +315,12 @@ body.light .draw-text-inner{background:rgba(255,255,255,.9);color:#1e293b;border
 .pm-del-btn:hover{color:#ef4444}
 .pm-add-row{display:flex;gap:6px;margin-top:6px}
 .pm-add-row input{flex:1}
+
+/* Clickable color dot on layer buttons */
+.layer-color-dot{width:10px;height:10px;border-radius:50%;display:inline-block;flex-shrink:0;cursor:pointer;border:1px solid rgba(255,255,255,.25);transition:transform .15s,box-shadow .15s;margin-right:2px}
+.layer-color-dot:hover{transform:scale(1.5);box-shadow:0 0 0 2px rgba(255,255,255,.4)}
+/* Draw mode button highlight */
+#draw-mode-btn.active{border-color:#e879f9;color:#e879f9}
 
 /* Loading spinner */
 .loading-spinner{width:32px;height:32px;border:3px solid var(--border);border-top-color:var(--nice-blue);border-radius:50%;animation:spin .7s linear infinite}

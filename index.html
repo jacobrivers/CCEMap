@@ -41,95 +41,100 @@
 <!-- ── Controls Bar ──────────────────────────────────────────────────────── -->
 <div id="ctrl-bar">
 
-  <!-- Layer toggle buttons (static) -->
-  <button class="layer-btn active" data-layer="all" id="all-btn" onclick="toggleLayer('all')" style="font-weight:700">
-    All <span class="cnt" id="cnt-all">—</span>
-  </button>
-  <!-- Dynamic layer buttons injected by JS -->
-  <div id="layer-btns-dynamic" class="layer-btns-row"></div>
-
-  <div class="ctrl-sep"></div>
-
-  <!-- Pin Shape Dropdown -->
-  <div class="dd-wrap" id="pins-dd">
-    <button class="dd-btn ctrl-btn" onclick="toggleDD('pins-dd',event)" title="Pin shape">
-      <span id="pins-dd-sym">⬤</span> Shape
+  <!-- ROW 1: Layer toggle buttons -->
+  <div class="ctrl-row ctrl-layers-row">
+    <button class="layer-btn active" data-layer="all" id="all-btn" onclick="toggleLayer('all')" style="font-weight:700">
+      All <span class="cnt" id="cnt-all">—</span>
     </button>
-    <div class="dd-menu">
-      <div class="dd-item" onclick="setAllIcons('circle');closeDD('pins-dd')">⬤ Circle <span id="dc-circle"></span></div>
-      <div class="dd-item" onclick="setAllIcons('square');closeDD('pins-dd')">■ Square <span id="dc-square"></span></div>
-      <div class="dd-item" onclick="setAllIcons('diamond');closeDD('pins-dd')">◆ Diamond <span id="dc-diamond"></span></div>
-      <div class="dd-item" onclick="setAllIcons('star');closeDD('pins-dd')">★ Star <span id="dc-star"></span></div>
-      <div class="dd-item" onclick="setAllIcons('pin');closeDD('pins-dd')">📍 Pin <span id="dc-pin"></span></div>
-    </div>
+    <!-- Dynamic layer buttons injected by JS — click the colored dot to change color -->
+    <div id="layer-btns-dynamic" class="layer-btns-row"></div>
   </div>
 
-  <!-- Display Options Dropdown -->
-  <div class="dd-wrap" id="disp-dd">
-    <button class="dd-btn ctrl-btn" onclick="toggleDD('disp-dd',event)">⚙ Display</button>
-    <div class="dd-menu">
-      <div class="dd-item" onclick="toggleLabels()">🗺 Map labels <span id="dlbl-map">✓</span></div>
-      <div class="dd-item" onclick="togglePinLabels()">🏷 Pin labels <span id="dlbl-pin">✓</span></div>
+  <!-- ROW 2: Actions -->
+  <div class="ctrl-row ctrl-actions-row">
+
+    <!-- Add buttons -->
+    <button class="ctrl-btn add-btn" onclick="openModal(null)">＋ Add Location</button>
+    <button class="ctrl-btn cust-btn" onclick="openCustomerModal(null)">＋ Add Customer</button>
+
+    <div class="ctrl-sep"></div>
+
+    <!-- Drawing Dropdown -->
+    <div class="dd-wrap" id="draw-dd">
+      <button class="dd-btn ctrl-btn" id="draw-mode-btn" onclick="toggleDD('draw-dd',event)">✏️ Draw</button>
+      <div class="dd-menu">
+        <div class="dd-item" onclick="setDrawMode('line');closeDD('draw-dd')"><span class="dm-btn" data-mode="line">📏</span> Straight Line</div>
+        <div class="dd-item" onclick="setDrawMode('curve');closeDD('draw-dd')"><span class="dm-btn" data-mode="curve">〜</span> Curved Line</div>
+        <div class="dd-item" onclick="setDrawMode('text');closeDD('draw-dd')"><span class="dm-btn" data-mode="text">T</span> Text Label</div>
+        <div class="dd-divider"></div>
+        <div class="dd-item" onclick="setDrawMode(null);closeDD('draw-dd')">✖ Stop Drawing</div>
+        <div class="dd-item" onclick="toggleDrawings();closeDD('draw-dd')" id="dm-toggle">👁 Toggle Drawings</div>
+        <div class="dd-item" onclick="clearAllDrawings();closeDD('draw-dd')">🗑 Clear Drawings</div>
+      </div>
     </div>
-  </div>
 
-  <!-- Platform Filter -->
-  <button class="ctrl-btn" id="pf-btn" onclick="openPFModal()">
-    🔍 Filter <span id="pf-badge" class="badge" style="display:none">0</span>
-  </button>
+    <div class="ctrl-sep"></div>
 
-  <div class="ctrl-sep"></div>
-
-  <!-- Add Location -->
-  <button class="ctrl-btn add-btn" onclick="openModal(null)">＋ Add Location</button>
-
-  <!-- Add Customer -->
-  <button class="ctrl-btn cust-btn" onclick="openCustomerModal(null)">＋ Add Customer</button>
-
-  <!-- Drawing Toolbar Dropdown -->
-  <div class="dd-wrap" id="draw-dd">
-    <button class="dd-btn ctrl-btn" onclick="toggleDD('draw-dd',event)">✏️ Draw</button>
-    <div class="dd-menu">
-      <div class="dd-item" onclick="setDrawMode('line');closeDD('draw-dd')"><span class="dm-btn" data-mode="line">📏</span> Straight Line</div>
-      <div class="dd-item" onclick="setDrawMode('curve');closeDD('draw-dd')"><span class="dm-btn" data-mode="curve">〜</span> Curved Line</div>
-      <div class="dd-item" onclick="setDrawMode('text');closeDD('draw-dd')"><span class="dm-btn" data-mode="text">T</span> Text Label</div>
-      <div class="dd-divider"></div>
-      <div class="dd-item" onclick="setDrawMode(null);closeDD('draw-dd')">✖ Stop Drawing</div>
-      <div class="dd-item" onclick="toggleDrawings();closeDD('draw-dd')" id="dm-toggle">👁 Toggle Drawings</div>
-      <div class="dd-item" onclick="clearAllDrawings();closeDD('draw-dd')">🗑 Clear Drawings</div>
+    <!-- Pin Shape Dropdown -->
+    <div class="dd-wrap" id="pins-dd">
+      <button class="dd-btn ctrl-btn" onclick="toggleDD('pins-dd',event)" title="Pin shape">
+        <span id="pins-dd-sym">⬤</span> Shape
+      </button>
+      <div class="dd-menu">
+        <div class="dd-item" onclick="setAllIcons('circle');closeDD('pins-dd')">⬤ Circle <span id="dc-circle"></span></div>
+        <div class="dd-item" onclick="setAllIcons('square');closeDD('pins-dd')">■ Square <span id="dc-square"></span></div>
+        <div class="dd-item" onclick="setAllIcons('diamond');closeDD('pins-dd')">◆ Diamond <span id="dc-diamond"></span></div>
+        <div class="dd-item" onclick="setAllIcons('star');closeDD('pins-dd')">★ Star <span id="dc-star"></span></div>
+        <div class="dd-item" onclick="setAllIcons('pin');closeDD('pins-dd')">📍 Pin <span id="dc-pin"></span></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Export Dropdown -->
-  <div class="dd-wrap" id="exp-dd">
-    <button class="dd-btn ctrl-btn" onclick="toggleDD('exp-dd',event)">⬇ Export</button>
-    <div class="dd-menu">
-      <div class="dd-item" onclick="exportAllFiles();closeDD('exp-dd')">📦 Export Data Files</div>
-      <div class="dd-item" onclick="exportAsImage();closeDD('exp-dd')">🖼 Export as Image</div>
-      <div class="dd-item" onclick="exportAsPDF();closeDD('exp-dd')">📄 Export as PDF</div>
+    <!-- Display Options Dropdown -->
+    <div class="dd-wrap" id="disp-dd">
+      <button class="dd-btn ctrl-btn" onclick="toggleDD('disp-dd',event)">Display</button>
+      <div class="dd-menu">
+        <div class="dd-item" onclick="toggleLabels()">🗺 Map labels <span id="dlbl-map">✓</span></div>
+        <div class="dd-item" onclick="togglePinLabels()">🏷 Pin labels <span id="dlbl-pin">✓</span></div>
+      </div>
     </div>
-  </div>
 
-  <!-- Import -->
-  <button class="ctrl-btn" onclick="importFiles()">⬆ Import</button>
-  <input type="file" id="import-file" accept=".json" multiple style="display:none" onchange="handleImportFile(event)"/>
+    <!-- Platform Filter -->
+    <button class="ctrl-btn" id="pf-btn" onclick="openPFModal()">
+      🔍 Filter <span id="pf-badge" class="badge" style="display:none">0</span>
+    </button>
 
-  <div class="ctrl-sep"></div>
+    <div class="ctrl-sep"></div>
 
-  <!-- Manage Dropdown -->
-  <div class="dd-wrap" id="mgr-dd">
-    <button class="dd-btn ctrl-btn" onclick="toggleDD('mgr-dd',event)">⚙ Manage</button>
-    <div class="dd-menu">
-      <div class="dd-item" onclick="openPlatformMgr();closeDD('mgr-dd')">🗂 Platforms</div>
-      <div class="dd-item" onclick="openMT();closeDD('mgr-dd')">🎨 Marker Types</div>
+    <!-- Export Dropdown -->
+    <div class="dd-wrap" id="exp-dd">
+      <button class="dd-btn ctrl-btn" onclick="toggleDD('exp-dd',event)">⬇ Export</button>
+      <div class="dd-menu">
+        <div class="dd-item" onclick="exportAllFiles();closeDD('exp-dd')">📦 Export Data Files</div>
+        <div class="dd-item" onclick="exportAsImage();closeDD('exp-dd')">🖼 Export as Image</div>
+        <div class="dd-item" onclick="exportAsPDF();closeDD('exp-dd')">📄 Export as PDF</div>
+      </div>
     </div>
+
+    <!-- Import -->
+    <button class="ctrl-btn" onclick="importFiles()">⬆ Import</button>
+    <input type="file" id="import-file" accept=".json" multiple style="display:none" onchange="handleImportFile(event)"/>
+
+    <!-- Manage Dropdown -->
+    <div class="dd-wrap" id="mgr-dd">
+      <button class="dd-btn ctrl-btn" onclick="toggleDD('mgr-dd',event)">⚙ Manage</button>
+      <div class="dd-menu">
+        <div class="dd-item" onclick="openPlatformMgr();closeDD('mgr-dd')">🗂 Platforms</div>
+        <div class="dd-item" onclick="openMT();closeDD('mgr-dd')">🎨 Marker Types</div>
+      </div>
+    </div>
+
+    <div class="ctrl-sep"></div>
+
+    <!-- Panel Toggles -->
+    <button class="ctrl-btn" id="list-btn" onclick="togglePanel()">☰ Locations</button>
+    <button class="ctrl-btn" id="cust-panel-btn" onclick="toggleLeftPanel()">🏢 Customers</button>
+
   </div>
-
-  <!-- Side Panel Toggle -->
-  <button class="ctrl-btn" id="list-btn" onclick="togglePanel()">☰ Locations</button>
-
-  <!-- Left Panel Toggle -->
-  <button class="ctrl-btn" id="cust-panel-btn" onclick="toggleLeftPanel()">🏢 Customers</button>
 
 </div>
 
