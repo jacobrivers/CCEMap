@@ -1,0 +1,8 @@
+[
+  { "key": "appstack",     "color": "#2B8EFF", "label": "Application Stack" },
+  { "key": "voicepop",     "color": "#8B5CF6", "label": "Voice POP" },
+  { "key": "sovregion",    "color": "#F59E0B", "label": "SOV Region" },
+  { "key": "fedramp",      "color": "#22c55e", "label": "FedRamp" },
+  { "key": "sovvoice",     "color": "#f97316", "label": "SOV Voice" },
+  { "key": "fedrampvoice", "color": "#e879f9", "label": "FedRamp Voice" }
+]

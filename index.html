@@ -1,248 +1,403 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>NiCE CXone – Global AI CX Reach &amp; Coverage</title>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>NiCE CXone Global Coverage Map</title>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <link rel="stylesheet" href="css/map.css"/>
 </head>
-<body class="dark">
+<body>
 
-<!-- Loading overlay (hidden once data loads) -->
+<!-- ── Loading Overlay ───────────────────────────────────────────────────── -->
 <div id="loading-overlay">
-  <div class="loading-logo">N<span class="p">i</span>CE CX<span class="p">one</span></div>
-  <div class="loading-bar"><div class="loading-bar-fill"></div></div>
-  <div class="loading-msg" id="loading-msg">Initialising…</div>
+  <div class="loading-box">
+    <div class="loading-logo">NiCE</div>
+    <div class="loading-spinner"></div>
+    <div id="loading-msg" class="loading-msg">Initializing…</div>
+  </div>
 </div>
 
-<!-- Header -->
-<header>
-  <div class="logo">N<span class="p">i</span>CE &nbsp;<span style="font-weight:400">CX</span><span class="p">one</span></div>
-  <h1>Global AI CX Reach &amp; Coverage</h1>
-  <div class="stats">
-    <div class="pill"><strong id="stat-regions">—</strong> Regions</div>
-    <div class="pill"><strong id="stat-voicepops">—</strong> Voice POPs</div>
-    <div class="pill"><strong id="stat-total">—</strong> Locations</div>
-    <span id="source-badge" class="source-badge">—</span>
+<!-- ── Header ────────────────────────────────────────────────────────────── -->
+<header id="app-header">
+  <div class="hdr-left">
+    <div class="app-logo">NiCE <span class="p">CXone</span></div>
+    <div class="app-subtitle">Global Coverage Map</div>
+    <span id="source-badge" class="source-badge">GitHub</span>
+  </div>
+  <div class="hdr-stats">
+    <div class="stat-pill"><span class="sp-icon">🌍</span><span id="stat-regions">—</span><span class="sp-label">Regions</span></div>
+    <div class="stat-pill"><span class="sp-icon">📡</span><span id="stat-voicepops">—</span><span class="sp-label">Voice POPs</span></div>
+    <div class="stat-pill"><span class="sp-icon">📍</span><span id="stat-total">—</span><span class="sp-label">Locations</span></div>
+    <div class="stat-pill cust-pill"><span class="sp-icon">🏢</span><span id="stat-customers">—</span><span class="sp-label">Customers</span></div>
+  </div>
+  <div class="hdr-right">
+    <button class="hdr-btn" id="theme-btn" onclick="toggleTheme()">🌙 Dark</button>
+    <button class="hdr-btn" id="nowrap-btn" onclick="toggleNoWrap()">🌍 Wrap</button>
+    <button class="hdr-btn" onclick="reloadFromSource()">↺ Reset</button>
   </div>
 </header>
 
-<!-- Controls -->
-<div class="controls">
-  <span class="clabel">Layers</span>
-  <button class="layer-btn active" data-layer="all" onclick="toggleLayer('all')"><span class="dot" id="dot-all"></span>All <span class="cnt" id="cnt-all">—</span></button>
-  <div id="layer-btns-dynamic" style="display:contents"></div>
+<!-- ── Controls Bar ──────────────────────────────────────────────────────── -->
+<div id="ctrl-bar">
 
-  <div class="sep"></div>
-  <span class="clabel">Filter</span>
-  <button class="ctrl-btn" id="pf-btn" onclick="openPFModal()">🎛️ By Platform <span id="pf-badge" style="display:none;background:var(--nice-pink);color:#fff;border-radius:10px;padding:0 5px;font-size:10px;margin-left:2px"></span></button>
+  <!-- Layer toggle buttons (static) -->
+  <button class="layer-btn active" data-layer="all" id="all-btn" onclick="toggleLayer('all')" style="font-weight:700">
+    All <span class="cnt" id="cnt-all">—</span>
+  </button>
+  <!-- Dynamic layer buttons injected by JS -->
+  <div id="layer-btns-dynamic" class="layer-btns-row"></div>
 
-  <div class="sep"></div>
-  <span class="clabel">All Pins</span>
-  <div class="dd-wrap" id="dd-pins">
-    <button class="dd-btn" id="pins-dd-btn" onclick="toggleDD('dd-pins',event)"><span id="pins-dd-sym">⬤</span> Pins ▾</button>
+  <div class="ctrl-sep"></div>
+
+  <!-- Pin Shape Dropdown -->
+  <div class="dd-wrap" id="pins-dd">
+    <button class="dd-btn ctrl-btn" onclick="toggleDD('pins-dd',event)" title="Pin shape">
+      <span id="pins-dd-sym">⬤</span> Shape
+    </button>
     <div class="dd-menu">
-      <div class="dd-item" data-shape="circle"  onclick="setAllIcons('circle');closeDD('dd-pins')"><span class="dd-check" id="dc-circle">✓</span>⬤ Circle</div>
-      <div class="dd-item" data-shape="pin"     onclick="setAllIcons('pin');closeDD('dd-pins')"><span class="dd-check" id="dc-pin"></span>📍 Pin</div>
-      <div class="dd-item" data-shape="star"    onclick="setAllIcons('star');closeDD('dd-pins')"><span class="dd-check" id="dc-star"></span>★ Star</div>
-      <div class="dd-item" data-shape="square"  onclick="setAllIcons('square');closeDD('dd-pins')"><span class="dd-check" id="dc-square"></span>■ Square</div>
-      <div class="dd-item" data-shape="diamond" onclick="setAllIcons('diamond');closeDD('dd-pins')"><span class="dd-check" id="dc-diamond"></span>◆ Diamond</div>
-      <div class="dd-item" data-shape="mixed"   onclick="closeDD('dd-pins')"><span class="dd-check" id="dc-mixed"></span>∷ Mixed</div>
+      <div class="dd-item" onclick="setAllIcons('circle');closeDD('pins-dd')">⬤ Circle <span id="dc-circle"></span></div>
+      <div class="dd-item" onclick="setAllIcons('square');closeDD('pins-dd')">■ Square <span id="dc-square"></span></div>
+      <div class="dd-item" onclick="setAllIcons('diamond');closeDD('pins-dd')">◆ Diamond <span id="dc-diamond"></span></div>
+      <div class="dd-item" onclick="setAllIcons('star');closeDD('pins-dd')">★ Star <span id="dc-star"></span></div>
+      <div class="dd-item" onclick="setAllIcons('pin');closeDD('pins-dd')">📍 Pin <span id="dc-pin"></span></div>
     </div>
   </div>
 
-  <div class="sep"></div>
-  <button class="ctrl-btn" id="theme-btn"  onclick="toggleTheme()">🌙 Dark</button>
-  <div class="dd-wrap" id="dd-labels">
-    <button class="dd-btn" onclick="toggleDD('dd-labels',event)">🏷️ Labels ▾</button>
+  <!-- Display Options Dropdown -->
+  <div class="dd-wrap" id="disp-dd">
+    <button class="dd-btn ctrl-btn" onclick="toggleDD('disp-dd',event)">⚙ Display</button>
     <div class="dd-menu">
-      <div class="dd-item" onclick="toggleLabels();event.stopPropagation()"><span class="dd-check" id="dlbl-map">✓</span>🗺️ Map Labels</div>
-      <div class="dd-item" onclick="togglePinLabels();event.stopPropagation()"><span class="dd-check" id="dlbl-pin">✓</span>📍 Pin Labels</div>
+      <div class="dd-item" onclick="toggleLabels()">🗺 Map labels <span id="dlbl-map">✓</span></div>
+      <div class="dd-item" onclick="togglePinLabels()">🏷 Pin labels <span id="dlbl-pin">✓</span></div>
     </div>
   </div>
-  <button class="ctrl-btn" id="list-btn"   onclick="togglePanel()">📋 List</button>
-  <button class="ctrl-btn" id="undo-btn"   onclick="undoDelete()" style="display:none">↩️ Undo</button>
-  <div class="dd-wrap" id="dd-settings">
-    <button class="dd-btn" onclick="toggleDD('dd-settings',event)">⚙️ Settings ▾</button>
-    <div class="dd-menu">
-      <div class="dd-item" onclick="openPlatformMgr();closeDD('dd-settings')"><span class="dd-check"></span>⚙️ Platforms</div>
-      <div class="dd-item" onclick="openMT();closeDD('dd-settings')"><span class="dd-check"></span>🎨 Marker Types</div>
-      <div class="dd-sep"></div>
-      <div class="dd-item" onclick="reloadFromSource();closeDD('dd-settings')"><span class="dd-check"></span>🔄 Sync</div>
-      <div class="dd-item" onclick="exportSettings();closeDD('dd-settings')"><span class="dd-check"></span>💾 Export</div>
-      <div class="dd-item" onclick="importSettings();closeDD('dd-settings')"><span class="dd-check"></span>📂 Import</div>
-      <div class="dd-sep"></div>
-      <div class="dd-item" onclick="exportSourceFile();closeDD('dd-settings')"><span class="dd-check"></span>📦 Export Source File</div>
-      <div class="dd-sep"></div>
-      <div class="dd-item" onclick="exportTypeFiles();closeDD('dd-settings')"><span class="dd-check"></span>📂 Export Data Files</div>
-    </div>
-  </div>
-  <input type="file" id="import-file" accept=".json" style="display:none" onchange="handleImportFile(event)">
 
-  <div class="spacer"></div>
-  <button class="ctrl-btn" onclick="openPlatformMgr()" title="Add, remove, or rename platforms/services" style="flex-shrink:0">⚙️ Platforms</button>
-  <button class="add-btn" onclick="openModal(null)">＋ Add Location</button>
+  <!-- Platform Filter -->
+  <button class="ctrl-btn" id="pf-btn" onclick="openPFModal()">
+    🔍 Filter <span id="pf-badge" class="badge" style="display:none">0</span>
+  </button>
+
+  <div class="ctrl-sep"></div>
+
+  <!-- Add Location -->
+  <button class="ctrl-btn add-btn" onclick="openModal(null)">＋ Add Location</button>
+
+  <!-- Add Customer -->
+  <button class="ctrl-btn cust-btn" onclick="openCustomerModal(null)">＋ Add Customer</button>
+
+  <!-- Drawing Toolbar Dropdown -->
+  <div class="dd-wrap" id="draw-dd">
+    <button class="dd-btn ctrl-btn" onclick="toggleDD('draw-dd',event)">✏️ Draw</button>
+    <div class="dd-menu">
+      <div class="dd-item" onclick="setDrawMode('line');closeDD('draw-dd')"><span class="dm-btn" data-mode="line">📏</span> Straight Line</div>
+      <div class="dd-item" onclick="setDrawMode('curve');closeDD('draw-dd')"><span class="dm-btn" data-mode="curve">〜</span> Curved Line</div>
+      <div class="dd-item" onclick="setDrawMode('text');closeDD('draw-dd')"><span class="dm-btn" data-mode="text">T</span> Text Label</div>
+      <div class="dd-divider"></div>
+      <div class="dd-item" onclick="setDrawMode(null);closeDD('draw-dd')">✖ Stop Drawing</div>
+      <div class="dd-item" onclick="toggleDrawings();closeDD('draw-dd')" id="dm-toggle">👁 Toggle Drawings</div>
+      <div class="dd-item" onclick="clearAllDrawings();closeDD('draw-dd')">🗑 Clear Drawings</div>
+    </div>
+  </div>
+
+  <!-- Export Dropdown -->
+  <div class="dd-wrap" id="exp-dd">
+    <button class="dd-btn ctrl-btn" onclick="toggleDD('exp-dd',event)">⬇ Export</button>
+    <div class="dd-menu">
+      <div class="dd-item" onclick="exportAllFiles();closeDD('exp-dd')">📦 Export Data Files</div>
+      <div class="dd-item" onclick="exportAsImage();closeDD('exp-dd')">🖼 Export as Image</div>
+      <div class="dd-item" onclick="exportAsPDF();closeDD('exp-dd')">📄 Export as PDF</div>
+    </div>
+  </div>
+
+  <!-- Import -->
+  <button class="ctrl-btn" onclick="importFiles()">⬆ Import</button>
+  <input type="file" id="import-file" accept=".json" multiple style="display:none" onchange="handleImportFile(event)"/>
+
+  <div class="ctrl-sep"></div>
+
+  <!-- Manage Dropdown -->
+  <div class="dd-wrap" id="mgr-dd">
+    <button class="dd-btn ctrl-btn" onclick="toggleDD('mgr-dd',event)">⚙ Manage</button>
+    <div class="dd-menu">
+      <div class="dd-item" onclick="openPlatformMgr();closeDD('mgr-dd')">🗂 Platforms</div>
+      <div class="dd-item" onclick="openMT();closeDD('mgr-dd')">🎨 Marker Types</div>
+    </div>
+  </div>
+
+  <!-- Side Panel Toggle -->
+  <button class="ctrl-btn" id="list-btn" onclick="togglePanel()">☰ Locations</button>
+
+  <!-- Left Panel Toggle -->
+  <button class="ctrl-btn" id="cust-panel-btn" onclick="toggleLeftPanel()">🏢 Customers</button>
+
 </div>
 
-<!-- Main -->
-<div class="main">
+<!-- ── Draw Hint ─────────────────────────────────────────────────────────── -->
+<div id="draw-hint" class="draw-hint" style="display:none"></div>
+
+<!-- ── Map Layout ────────────────────────────────────────────────────────── -->
+<div id="app-body">
+
+  <!-- Left Panel: Customer Sites -->
+  <div id="left-panel" class="left-panel hidden">
+    <div class="lp-header">
+      <span>🏢 Customer Sites</span>
+      <span id="lp-count" class="lp-count">0</span>
+      <button class="lp-close" onclick="toggleLeftPanel()">✕</button>
+    </div>
+    <div class="lp-search">
+      <input id="lp-search-inp" placeholder="Search customers…" autocomplete="off"/>
+    </div>
+    <div id="lp-list" class="lp-list"></div>
+    <div class="lp-footer">
+      <button class="ctrl-btn add-btn" onclick="openCustomerModal(null)">＋ Add Customer</button>
+    </div>
+  </div>
+
+  <!-- Map -->
   <div id="map"></div>
 
-  <!-- Side panel -->
-  <div class="side-panel hidden" id="side-panel">
+  <!-- Right Panel: Locations List -->
+  <div id="side-panel" class="side-panel hidden">
     <div class="sp-header">
-      <span class="sp-title">📍 Locations</span>
-      <span class="sp-count" id="sp-count">—</span>
-      <button class="ctrl-btn" style="padding:2px 8px;font-size:11px;" onclick="openModal(null)">＋ Add</button>
-    </div>
-    <div class="sp-tabs">
-      <button class="sp-tab active" data-view="table"      onclick="setLegendView('table')">Table</button>
-      <button class="sp-tab"        data-view="bytype"     onclick="setLegendView('bytype')">By Type</button>
-      <button class="sp-tab"        data-view="byplatform" onclick="setLegendView('byplatform')">By Platform</button>
+      <span>Locations</span>
+      <span id="sp-count" class="sp-count">0 total</span>
     </div>
     <div class="sp-search">
-      <input type="text" id="sp-search" placeholder="Search name, city, state, region, country, platform…"/>
+      <input id="sp-search" placeholder="Search…" autocomplete="off"/>
     </div>
-    <div class="sp-table-wrap" id="sp-table-wrap">
-      <table>
+    <div class="sp-tabs">
+      <button class="sp-tab active" data-view="table" onclick="setLegendView('table')">Table</button>
+      <button class="sp-tab" data-view="bytype" onclick="setLegendView('bytype')">By Type</button>
+      <button class="sp-tab" data-view="byplatform" onclick="setLegendView('byplatform')">By Platform</button>
+    </div>
+    <!-- Table view -->
+    <div id="sp-table-wrap" class="sp-table-wrap">
+      <table class="sp-table">
         <thead>
           <tr>
-            <th onclick="sortBy('name')"    id="th-name">Name ↕</th>
-            <th onclick="sortBy('region')"  id="th-region">Region ↕</th>
-            <th onclick="sortBy('country')" id="th-country">Location ↕</th>
-            <th>Platforms</th>
-            <th style="width:76px;text-align:center">Actions</th>
+            <th id="th-name" onclick="sortBy('name')" class="sortable">Name ↕</th>
+            <th id="th-region" onclick="sortBy('region')" class="sortable">Region ↕</th>
+            <th id="th-country" onclick="sortBy('country')" class="sortable">Country ↕</th>
+            <th>Platform</th>
+            <th style="width:70px">Actions</th>
           </tr>
         </thead>
         <tbody id="sp-tbody"></tbody>
       </table>
     </div>
-    <div class="leg-view" id="leg-view" style="display:none"></div>
+    <!-- Legend/group view -->
+    <div id="leg-view" class="leg-view" style="display:none"></div>
   </div>
+
 </div>
 
-<!-- Undo toast -->
-<div class="toast" id="toast">
-  <span id="toast-msg"></span>
-  <button class="toast-undo" onclick="undoDelete()">Undo</button>
-  <div class="toast-bar" id="toast-bar"></div>
-</div>
-
-<!-- Add / Edit Location Modal -->
-<div class="overlay" id="modal">
-  <div class="modal">
-    <h2 id="modal-title">＋ Add <span class="p">Location</span></h2>
-    <div class="frow">
-      <div class="fg" style="flex:2"><label>Display Name</label><input type="text" id="m-name" placeholder="e.g. London &amp; Manchester" oninput="clearCoords()"/></div>
-      <div class="fg"><label>City</label><input type="text" id="m-city" placeholder="e.g. London"/></div>
+<!-- ── Add/Edit Location Modal ───────────────────────────────────────────── -->
+<div id="modal" class="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span id="modal-title">＋ Add <span class="p">Location</span></span>
+      <button class="modal-close" onclick="closeModal()">✕</button>
     </div>
-    <div class="frow">
-      <div class="fg"><label>Country</label><input type="text" id="m-country" placeholder="e.g. United Kingdom" oninput="checkUSState()"/></div>
-      <div class="fg"><label>Region</label>
-        <select id="m-region" onchange="onRegionChange()"></select>
-        <input type="text" id="m-region-new" placeholder="New region name…" style="display:none;margin-top:4px;width:100%;box-sizing:border-box;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--badge);color:var(--fg);font-size:12px"/>
+    <div class="modal-body">
+      <div class="fg"><label>Name *</label><input id="m-name" placeholder="e.g. London DC"/></div>
+      <div class="fg frow">
+        <div class="fg"><label>City</label><input id="m-city" placeholder="City"/></div>
+        <div class="fg"><label>Country</label><input id="m-country" placeholder="Country" oninput="checkUSState()"/></div>
       </div>
-    </div>
-    <div class="fg" id="state-row" style="display:none">
-      <label>State</label>
-      <select id="m-state"><option value="">— Select State —</option></select>
-    </div>
-    <div class="fg"><label>Platform / Service</label>
-      <select id="m-plat" style="width:100%;padding:6px 8px;border-radius:6px;border:1px solid var(--border);background:var(--badge);color:var(--fg);font-size:12px"></select>
-    </div>
-    <div class="fg"><label>Marker Color</label>
-      <select id="m-type"></select>
-    </div>
-    <div class="fg">
-      <label>Pin Label</label>
-      <div class="label-row">
-        <input type="text" id="m-label" placeholder="Defaults to display name"/>
-        <label class="label-toggle"><input type="checkbox" id="m-label-on"> Show on map</label>
+      <div class="fg" id="state-row" style="display:none">
+        <label>State</label>
+        <select id="m-state"><option value="">— Select state —</option></select>
       </div>
-    </div>
-    <div class="fg"><label>Pin Icon</label>
-      <div class="icon-picker-row" id="m-icon-picker">
-        <div class="iopt sel" data-icon="circle"  onclick="selIcon('circle')" ><span>⬤</span>Circle</div>
-        <div class="iopt"     data-icon="pin"     onclick="selIcon('pin')"    ><span>📍</span>Pin</div>
-        <div class="iopt"     data-icon="star"    onclick="selIcon('star')"   ><span>★</span>Star</div>
-        <div class="iopt"     data-icon="square"  onclick="selIcon('square')" ><span>■</span>Square</div>
-        <div class="iopt"     data-icon="diamond" onclick="selIcon('diamond')"><span>◆</span>Diamond</div>
+      <div class="fg frow">
+        <div class="fg"><label>Region</label>
+          <select id="m-region" onchange="onRegionChange()"><option value="">— Select —</option></select>
+        </div>
+        <div class="fg"><input id="m-region-new" placeholder="New region name" style="display:none;margin-top:22px"/></div>
       </div>
-    </div>
-    <div class="frow">
-      <div class="fg"><label>Latitude</label> <input type="number" id="m-lat" placeholder="e.g. 51.5074" step=".0001"/></div>
-      <div class="fg"><label>Longitude</label><input type="number" id="m-lng" placeholder="e.g. -0.1278" step=".0001"/></div>
-    </div>
-    <div class="geocode-row">
-      <button class="geo-btn" onclick="geocode()">🔍 Look up from name</button>
-      <button class="geo-btn pick" onclick="toggleMapPicker()">📍 Pick on Map</button>
-      <span class="geo-st" id="geo-st">or right-click the map to set coordinates</span>
-    </div>
-    <div id="modal-map-wrap">
-      <div class="map-pick-hint">Click anywhere on the map to set coordinates</div>
-      <div id="modal-map-pick"></div>
+      <div class="fg frow">
+        <div class="fg"><label>Platform</label>
+          <select id="m-plat"><option value="">— Select platform —</option></select>
+        </div>
+        <div class="fg"><label>Type</label><select id="m-type"></select></div>
+      </div>
+      <div class="fg"><label>Pin Shape</label>
+        <div id="m-icon-picker" class="icon-picker">
+          <div class="iopt" data-icon="circle" onclick="selIcon('circle')">⬤ Circle</div>
+          <div class="iopt" data-icon="square" onclick="selIcon('square')">■ Square</div>
+          <div class="iopt" data-icon="diamond" onclick="selIcon('diamond')">◆ Diamond</div>
+          <div class="iopt" data-icon="star" onclick="selIcon('star')">★ Star</div>
+          <div class="iopt" data-icon="pin" onclick="selIcon('pin')">📍 Pin</div>
+        </div>
+      </div>
+      <div class="fg"><label>Pin Label (optional)</label>
+        <div class="frow" style="gap:8px">
+          <input id="m-label" placeholder="Short label on map" style="flex:1"/>
+          <label class="check-label"><input type="checkbox" id="m-label-on"/> Show</label>
+        </div>
+      </div>
+      <div class="geo-row">
+        <div class="fg frow">
+          <div class="fg"><label>Lat *</label><input id="m-lat" type="number" step="0.0001" placeholder="e.g. 51.5074"/></div>
+          <div class="fg"><label>Lng *</label><input id="m-lng" type="number" step="0.0001" placeholder="e.g. -0.1278"/></div>
+        </div>
+        <div class="geo-actions">
+          <button class="geo-btn" onclick="geocode()">🔍 Look up</button>
+          <button class="geo-btn" onclick="toggleMapPicker()">🗺 Pick on map</button>
+        </div>
+        <div id="geo-st" class="geo-st">or right-click the map to set coordinates</div>
+      </div>
+      <div id="modal-map-wrap" style="display:none">
+        <div id="modal-map-pick" style="height:200px;border-radius:6px;overflow:hidden;margin-top:8px"></div>
+      </div>
     </div>
     <div class="modal-actions">
-      <button class="btn-c" onclick="closeModal()">Cancel</button>
-      <button class="btn-s" id="modal-save-btn" onclick="saveModal()">Add to Map</button>
+      <button class="modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="modal-save" id="modal-save-btn" onclick="saveModal()">Add to Map</button>
     </div>
   </div>
 </div>
 
-<!-- Platform Filter Modal -->
-<div class="overlay" id="pf-overlay">
-  <div class="modal" style="width:560px">
-    <h2>🎛️ Filter <span class="p">by Platform</span></h2>
-    <p style="font-size:11.5px;color:var(--muted);margin-bottom:14px">Show only pins that offer <strong>at least one</strong> selected platform. Uncheck all to show everything.</p>
-    <div style="display:flex;align-items:center;gap:6px;margin-bottom:10px;">
-      <span class="pf-select-all" onclick="pfSelectAll()">Select all</span>
-      <span class="pf-clear-all"  onclick="pfClearAll()">Clear all</span>
-      <span style="flex:1"></span>
-      <span id="pf-match-count" style="font-size:11px;color:var(--muted)"></span>
+<!-- ── Add/Edit Customer Modal ───────────────────────────────────────────── -->
+<div id="cm-overlay" class="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span id="cm-title">＋ Add <span class="p">Customer Site</span></span>
+      <button class="modal-close" onclick="closeCustomerModal()">✕</button>
     </div>
-    <div class="pf-modal-grid" id="pf-modal-grid"></div>
-    <div class="modal-actions" style="margin-top:16px">
-      <button class="btn-c" onclick="closePFModal()">Cancel</button>
-      <button class="btn-s" onclick="applyPFModal()">Apply Filter</button>
+    <div class="modal-body">
+      <div class="fg"><label>Company Name *</label><input id="cm-company" placeholder="Acme Corp"/></div>
+      <div class="fg"><label>Site Name *</label><input id="cm-name" placeholder="HQ, Chicago Office…"/></div>
+      <div class="fg frow">
+        <div class="fg"><label>City</label><input id="cm-city" placeholder="City"/></div>
+        <div class="fg"><label>Country</label><input id="cm-country" placeholder="Country"/></div>
+      </div>
+      <div class="fg"><label>Marker Color</label>
+        <div id="cm-color-swatches" class="color-swatches"></div>
+        <input type="color" id="cm-color-custom" style="margin-top:6px;width:40px;height:28px;border:none;cursor:pointer" oninput="selectCustColor(this.value)"/>
+      </div>
+      <div class="fg"><label>Marker Shape</label>
+        <div id="cm-icon-picker" class="icon-picker">
+          <div class="iopt" data-icon="circle" onclick="selCustIcon('circle')">⬤ Circle</div>
+          <div class="iopt" data-icon="square" onclick="selCustIcon('square')">■ Square</div>
+          <div class="iopt" data-icon="diamond" onclick="selCustIcon('diamond')">◆ Diamond</div>
+          <div class="iopt" data-icon="star" onclick="selCustIcon('star')">★ Star</div>
+          <div class="iopt" data-icon="pin" onclick="selCustIcon('pin')">📍 Pin</div>
+        </div>
+      </div>
+      <div class="geo-row">
+        <div class="fg frow">
+          <div class="fg"><label>Lat *</label><input id="cm-lat" type="number" step="0.0001" placeholder="Latitude"/></div>
+          <div class="fg"><label>Lng *</label><input id="cm-lng" type="number" step="0.0001" placeholder="Longitude"/></div>
+        </div>
+        <div class="geo-actions">
+          <button class="geo-btn" onclick="geocodeCustomer()">🔍 Look up</button>
+        </div>
+      </div>
+      <div class="fg"><label>Notes</label><textarea id="cm-notes" placeholder="Optional notes…" rows="2"></textarea></div>
     </div>
-  </div>
-</div>
-
-<!-- Platform Manager Modal -->
-<div class="overlay" id="pm-overlay">
-  <div class="modal" style="width:420px">
-    <h2>⚙️ Manage <span class="p">Platforms</span></h2>
-    <p style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Click a name to rename it. Changes are saved to your browser and included in Export.</p>
-    <div class="pm-list" id="pm-list"></div>
-    <div class="pm-add-row">
-      <input type="text" class="pm-add-inp" id="pm-new-name" placeholder="New platform name…"/>
-      <button class="pm-add-btn" onclick="addPlatform()">＋ Add</button>
-    </div>
-    <div class="modal-actions" style="margin-top:14px">
-      <button class="btn-c" onclick="closePM()">Cancel</button>
-      <button class="btn-s" onclick="savePlatforms()">Save</button>
-    </div>
-  </div>
-</div>
-
-<!-- Marker Type Editor Modal -->
-<div class="overlay" id="mt-overlay">
-  <div class="modal" style="width:500px">
-    <h2>🎨 Marker <span class="p">Types</span></h2>
-    <p style="font-size:11.5px;color:var(--muted);margin-bottom:12px">Customize the color and label for each marker type. Types in use by locations cannot be deleted.</p>
-    <div id="mt-list"></div>
-    <div style="margin-top:10px">
-      <button class="ctrl-btn" onclick="addMTRow()" style="font-size:12px">＋ Add Type</button>
-    </div>
-    <div class="modal-actions" style="margin-top:14px">
-      <button class="btn-c" onclick="closeMT()">Cancel</button>
-      <button class="btn-s" onclick="saveMT()">Apply Changes</button>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeCustomerModal()">Cancel</button>
+      <button class="modal-save" id="cm-save-btn" onclick="saveCustomerModal()">Add Site</button>
     </div>
   </div>
 </div>
 
+<!-- ── Platform Filter Modal ─────────────────────────────────────────────── -->
+<div id="pf-overlay" class="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span>🔍 Filter by Platform</span>
+      <button class="modal-close" onclick="closePFModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="pf-actions">
+        <button class="geo-btn" onclick="pfSelectAll()">Select All</button>
+        <button class="geo-btn" onclick="pfClearAll()">Clear All</button>
+        <span id="pf-match-count" style="color:var(--muted);font-size:11px"></span>
+      </div>
+      <div id="pf-modal-grid" class="pf-grid"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closePFModal()">Cancel</button>
+      <button class="modal-save" onclick="applyPFModal()">Apply Filter</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Platform Manager Modal ────────────────────────────────────────────── -->
+<div id="pm-overlay" class="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span>🗂 Manage Platforms</span>
+      <button class="modal-close" onclick="closePM()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--muted);font-size:11px;margin:0 0 8px">Platforms drive which JSON files appear as layers. Each platform slug must match its data/[slug].json file.</p>
+      <div id="pm-list" class="pm-list"></div>
+      <div class="pm-add-row">
+        <input id="pm-new-name" placeholder="New platform name (e.g. Enlighten AI)" style="flex:1"/>
+        <button class="geo-btn" onclick="addPlatform()">Add</button>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closePM()">Cancel</button>
+      <button class="modal-save" onclick="savePlatforms()">Save Platforms</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Marker Type Manager Modal ─────────────────────────────────────────── -->
+<div id="mt-overlay" class="overlay">
+  <div class="modal" role="dialog" aria-modal="true">
+    <div class="modal-header">
+      <span>🎨 Manage Marker Types</span>
+      <button class="modal-close" onclick="closeMT()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:var(--muted);font-size:11px;margin:0 0 8px">Changes are applied live. Save to persist to localStorage and export to update marker-types.json.</p>
+      <div id="mt-list" class="mt-list"></div>
+      <button class="geo-btn" onclick="addMTRow()" style="margin-top:8px">＋ Add Type</button>
+    </div>
+    <div class="modal-actions">
+      <button class="modal-cancel" onclick="closeMT()">Cancel</button>
+      <button class="modal-save" onclick="saveMT()">Save Types</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Toast ─────────────────────────────────────────────────────────────── -->
+<div id="toast" class="toast">
+  <span id="toast-msg"></span>
+  <button id="toast-undo" onclick="undoDelete()" style="display:none;margin-left:10px;background:none;border:1px solid rgba(255,255,255,.4);color:#fff;border-radius:4px;padding:2px 8px;cursor:pointer;font-size:11px">↩ Undo</button>
+  <div id="toast-bar" class="toast-bar"></div>
+</div>
+
+<!-- ── Scripts ───────────────────────────────────────────────────────────── -->
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/map.js"></script>
+<script>
+// Customer geocode helper (modal context)
+async function geocodeCustomer() {
+  const city = document.getElementById('cm-city').value.trim();
+  const country = document.getElementById('cm-country').value.trim();
+  const company = document.getElementById('cm-company').value.trim();
+  const query = [city || company, country].filter(Boolean).join(', ');
+  if (!query) { alert('Enter city or company name first.'); return; }
+  const cc = (GEO_CC[country.toLowerCase()] || []).join(',');
+  const url = `https://nominatim.openstreetmap.org/search?format=json&limit=1&q=${encodeURIComponent(query)}&accept-language=en${cc ? '&countrycodes=' + cc : ''}`;
+  try {
+    const r = await fetch(url, { headers: { 'Accept-Language': 'en' } });
+    const data = await r.json();
+    if (!data.length) { showToast('Location not found — enter coordinates manually'); return; }
+    document.getElementById('cm-lat').value = parseFloat(data[0].lat).toFixed(4);
+    document.getElementById('cm-lng').value = parseFloat(data[0].lon).toFixed(4);
+    showToast('Coordinates set ✓');
+  } catch(e) { showToast('Lookup failed'); }
+}
+</script>
 </body>
 </html>

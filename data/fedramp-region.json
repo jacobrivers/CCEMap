@@ -1,0 +1,3 @@
+[
+  {"id":"dallas_fedramp","name":"Dallas","city":"Dallas","state":"Texas","country":"United States","region":"North America","platform":"FedRamp Region","type":"fedramp","lat":32.78,"lng":-96.80,"icon":"circle","label":"","labelOn":false}
+]
