@@ -1,0 +1,19 @@
+[
+  {
+    "id": "fedramp_template",
+    "name": "FedRAMP Voice POP (Template)",
+    "city": "",
+    "state": "",
+    "country": "",
+    "region": "",
+    "platform": "fedramp_voice_pop",
+    "type": "fedrampvoice",
+    "lat": 0,
+    "lng": 0,
+    "icon": "circle",
+    "label": "",
+    "labelOn": false,
+    "provider": "",
+    "address": ""
+  }
+]
