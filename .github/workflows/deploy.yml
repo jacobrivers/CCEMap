@@ -6,21 +6,21 @@ on:
   pull_request:
     branches: [ main ]
 
-env:
-  DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
-  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
-
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        node-version: [20, 22, 24]
     steps:
       - name: Check out code
         uses: actions/checkout@v5
 
-      - name: Setup Node.js
+      - name: Setup Node.js ${{ matrix.node-version }}
         uses: actions/setup-node@v5
         with:
-          node-version: '22'
+          node-version: ${{ matrix.node-version }}
           cache: 'npm'
 
       - name: Install dependencies
@@ -36,9 +36,7 @@ jobs:
         run: npm run build
 
   deploy:
-    needs: build
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Check out code
         uses: actions/checkout@v5
@@ -58,10 +56,8 @@ jobs:
             npm run build
             systemctl reload nginx
 
-  # Optional: backup before deploy
   backup:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     steps:
       - name: Check out code
         uses: actions/checkout@v5
