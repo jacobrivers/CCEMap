@@ -1,6 +1,6 @@
 {
   "platforms": [
-    "cxone_voice_pop"
+    "cxone_voice_pop",
     "fedramp_voice_pop"
   ]
 }
