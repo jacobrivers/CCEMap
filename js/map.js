@@ -31,7 +31,7 @@ const US_VARIANTS = ['usa','us','united states','united states of america'];
 const GEO_CC = {'united states':['us'],'usa':['us'],'u.s.a.':['us'],'u.s.':['us'],'united kingdom':['gb'],'uk':['gb'],'australia':['au'],'canada':['ca'],'germany':['de'],'france':['fr'],'netherlands':['nl'],'singapore':['sg'],'japan':['jp'],'india':['in'],'brazil':['br'],'mexico':['mx'],'south africa':['za'],'uae':['ae'],'united arab emirates':['ae'],'new zealand':['nz'],'ireland':['ie'],'israel':['il'],'saudi arabia':['sa'],'spain':['es'],'italy':['it'],'sweden':['se'],'norway':['no'],'denmark':['dk'],'finland':['fi'],'switzerland':['ch'],'austria':['at'],'belgium':['be'],'poland':['pl'],'portugal':['pt'],'czech republic':['cz'],'hungary':['hu'],'romania':['ro'],'greece':['gr'],'turkey':['tr'],'china':['cn'],'south korea':['kr'],'taiwan':['tw'],'hong kong':['hk'],'indonesia':['id'],'malaysia':['my'],'thailand':['th'],'philippines':['ph'],'vietnam':['vn'],'pakistan':['pk'],'bangladesh':['bd'],'egypt':['eg'],'nigeria':['ng'],'kenya':['ke'],'ghana':['gh'],'ethiopia':['et'],'argentina':['ar'],'colombia':['co'],'chile':['cl'],'peru':['pe']};
 
 // ─── Utilities ────────────────────────────────────────────────────────────────
-function slugify(name) { return (name||'').toLowerCase().replace(/[^a-z0-9_]+/g,'-').replace(/[-_]+/g,'-').replace(/^-|-$/g,''); }
+function slugify(name) { return (name||'').toLowerCase().replace(/[ _]+/g,'-').replace(/[^a-z0-9-]+/g,'').replace(/^-|-$/g,''); }
 function unslugify(slug) { return slug.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); }
 function isUSA(v) { return US_VARIANTS.includes((v||'').trim().toLowerCase()); }
 function tryParse(s,fb){ try{return JSON.parse(s)||fb}catch{return fb} }
@@ -79,7 +79,47 @@ async function boot() {
       platformData[slug] = Array.isArray(netData) ? netData : [];
     }
   }
-  locations = Object.values(platformData).flat();
+  // Load all location files from data directory (not in manifest)
+  const dataDir = 'data/';
+  const dataFiles = ['cxone-software.json', 'cxone_voice_pop.json', 'fedramp_voice_pop.json', 'fedramp-software.json'];
+  for (const filename of dataFiles) {
+    const fileSlug = filename.replace('.json', '');
+    if (filename.includes('software')) {
+      // Software locations should match software platform slug
+      const slugName = fileSlug.includes('_') ? fileSlug : slugify(fileSlug);
+      const lsData = tryParse(localStorage.getItem('nice_pd_'+slugName), null);
+      if (lsData) {
+        if (!platformData[slugName]) platformData[slugName] = [];
+        platformData[slugName] = [...platformData[slugName], ...lsData];
+      } else {
+        const netData = await fetchJSON(dataDir + fileSlug + '.json');
+        if (netData) {
+          if (!platformData[slugName]) platformData[slugName] = [];
+          platformData[slugName] = [...platformData[slugName], ...netData];
+        }
+      }
+    } else {
+      // POP locations match their platform slug directly
+      const lsData = tryParse(localStorage.getItem('nice_pd_'+slugName), null);
+      if (lsData) {
+        if (!platformData[slugName]) platformData[slugName] = [];
+        platformData[slugName] = [...platformData[slugName], ...lsData];
+      } else {
+        const netData = await fetchJSON(dataDir + fileSlug + '.json');
+        if (netData) {
+          if (!platformData[slugName]) platformData[slugName] = [];
+          platformData[slugName] = [...platformData[slugName], ...netData];
+        }
+      }
+    }
+  }
+  // Merge locations from all platforms, keeping the order per platform
+  locations = [];
+  manifest.platforms.forEach(slug => {
+    if (platformData[slug]) {
+      locations = [...locations, ...platformData[slug]];
+    }
+  });
 
   setLoadMsg('Loading customers & drawings…');
   const lsCust = tryParse(localStorage.getItem('nice_customers'), null);
