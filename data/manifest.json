@@ -1,10 +1,6 @@
 {
   "platforms": [
-    "cxone-software",
-    "cognigy-ai",
-    "voice-pop",
-    "pstn-carrier",
-    "sov-region",
-    "fedramp-region"
+    "cxone_voice_pop"
+    "fedramp_voice_pop"
   ]
 }
