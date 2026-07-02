@@ -1,12 +1,12 @@
 [
   {
     "id": "miami_voicepop",
-    "name": "Miami",
+    "name": "Voice POP (FedRAMP)",
     "city": "Miami",
     "state": "FL",
     "country": "United States",
     "region": "North America",
-    "platform": "Voice POP",
+    "platform": "fedramp_voice_pop",
     "type": "fedrampvoice",
     "lat": 25.7822,
     "lng": -80.1918,
@@ -23,7 +23,7 @@
     "state": "VA",
     "country": "United States",
     "region": "North America",
-    "platform": "Voice POP",
+    "platform": "fedramp_voice_pop",
     "type": "fedrampvoice",
     "lat": 38.4739,
     "lng": -77.9962,
