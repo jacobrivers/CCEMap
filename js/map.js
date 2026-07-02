@@ -71,6 +71,17 @@ async function boot() {
 
   setLoadMsg('Loading platform data…');
   let fromLocalStorage = false;
+
+  // Build map from filename to platform slug for auto-associating location files
+  const filenameToSlug = new Map();
+  manifest.platforms.forEach(slug => {
+    // Possible naming patterns for this platform's data file
+    const patterns = [slug, slug.replace(/-/g, '_'), slug.replace(/_/g, '-')];
+    patterns.forEach(pat => filenameToSlug.set(pat, slug));
+    filenameToSlug.set(slug, slug);
+  });
+
+  // First, load all manifest platforms
   for (const slug of manifest.platforms) {
     const lsData = tryParse(localStorage.getItem('nice_pd_'+slug), null);
     if (lsData) { platformData[slug] = lsData; fromLocalStorage = true; }
@@ -79,40 +90,39 @@ async function boot() {
       platformData[slug] = Array.isArray(netData) ? netData : [];
     }
   }
-  // Load all location files from data directory (not in manifest)
+
+  // Load location files from data directory that aren't in manifest
   const dataDir = 'data/';
   const dataFiles = ['cxone-software.json', 'cxone_voice_pop.json', 'fedramp_voice_pop.json', 'fedramp-software.json'];
   for (const filename of dataFiles) {
     const fileSlug = filename.replace('.json', '');
-    if (filename.includes('software')) {
-      // Software locations should match software platform slug
-      const slugName = fileSlug.includes('_') ? fileSlug : slugify(fileSlug);
-      const lsData = tryParse(localStorage.getItem('nice_pd_'+slugName), null);
-      if (lsData) {
-        if (!platformData[slugName]) platformData[slugName] = [];
-        platformData[slugName] = [...platformData[slugName], ...lsData];
-      } else {
-        const netData = await fetchJSON(dataDir + fileSlug + '.json');
-        if (netData) {
-          if (!platformData[slugName]) platformData[slugName] = [];
-          platformData[slugName] = [...platformData[slugName], ...netData];
-        }
-      }
+
+    // Check if this file slug matches any manifest platform (via slugify)
+    if (manifest.platforms.some(m => slugify(m) === slugify(fileSlug))) {
+      // This is a manifest platform file - already loaded above
+      continue;
+    }
+
+    // Determine the slug this file should map to
+    let targetSlug = filenameToSlug.get(fileSlug) || slugify(fileSlug);
+    if (!manifest.platforms.includes(targetSlug)) {
+      // File doesn't match any manifest platform
+      targetSlug = slugify(fileSlug);
+    }
+
+    if (!platformData[targetSlug]) platformData[targetSlug] = [];
+
+    const lsData = tryParse(localStorage.getItem('nice_pd_'+targetSlug), null);
+    if (lsData) {
+      platformData[targetSlug] = [...platformData[targetSlug], ...lsData];
     } else {
-      // POP locations match their platform slug directly
-      const lsData = tryParse(localStorage.getItem('nice_pd_'+slugName), null);
-      if (lsData) {
-        if (!platformData[slugName]) platformData[slugName] = [];
-        platformData[slugName] = [...platformData[slugName], ...lsData];
-      } else {
-        const netData = await fetchJSON(dataDir + fileSlug + '.json');
-        if (netData) {
-          if (!platformData[slugName]) platformData[slugName] = [];
-          platformData[slugName] = [...platformData[slugName], ...netData];
-        }
+      const netData = await fetchJSON(dataDir + fileSlug + '.json');
+      if (netData) {
+        platformData[targetSlug] = [...platformData[targetSlug], ...netData];
       }
     }
   }
+
   // Merge locations from all platforms, keeping the order per platform
   locations = [];
   manifest.platforms.forEach(slug => {
@@ -311,9 +321,10 @@ function resolveOverlaps() {
 
 // ─── Visibility ───────────────────────────────────────────────────────────────
 function isVisible(loc) {
-  if (layerOn[slugify(loc.platform)] === false) return false;
+  const slug = slugify(loc.platform);
+  if (layerOn[slug] === false) return false;
   if (platformFilter.size === 0) return true;
-  return platformFilter.has(loc.platform);
+  return platformFilter.has(slug);
 }
 function applyAllVisibility() {
   locations.forEach(loc=>{ const m=markerMap[loc.id]; if(!m) return; isVisible(loc)?map.addLayer(m):map.removeLayer(m); });
@@ -393,8 +404,9 @@ function openPFModal() { pfTemp=new Set(platformFilter); buildPFGrid(); updatePF
 function closePFModal() { document.getElementById('pf-overlay').classList.remove('open'); }
 function buildPFGrid() {
   const g=document.getElementById('pf-modal-grid'); if(!g) return;
-  const names=[...new Set(locations.map(l=>l.platform).filter(Boolean))].sort();
-  g.innerHTML=names.map(n=>`<div class="pf-item${pfTemp.has(n)?' sel':''}" onclick="pfToggle('${n}',this)">${n}</div>`).join('');
+  const names=[...new Set(locations.map(l=>l.platform).filter(Boolean))].map(n=>slugify(n)).sort();
+  const slugSet=manifest.platforms.map(slugify);
+  g.innerHTML=names.filter(n=>slugSet.includes(n)).map(n=>{ const origName=n.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); return `<div class="pf-item${pfTemp.has(n)?' sel':''}" onclick="pfToggle('${n}',this)">${origName}</div>`; }).join('');
 }
 function pfToggle(name,el) { pfTemp.has(name)?pfTemp.delete(name):pfTemp.add(name); el.classList.toggle('sel'); updatePFCount(); }
 function pfSelectAll() { const names=[...new Set(locations.map(l=>l.platform).filter(Boolean))]; names.forEach(n=>pfTemp.add(n)); buildPFGrid(); updatePFCount(); }
@@ -604,11 +616,15 @@ function handleImportFile(event) {
           const slug=name;
           if(!manifest.platforms.includes(slug)){ manifest.platforms.push(slug); layerOn[slug]=true; }
           platformData[slug]=Array.isArray(data)?data:[];
-          locations.filter(l=>slugify(l.platform)===slug).forEach(l=>{if(markerMap[l.id]){map.removeLayer(markerMap[l.id]);delete markerMap[l.id];}});
-          locations=locations.filter(l=>slugify(l.platform)!==slug);
+          // Remove locations that belong to this imported platform by slugified name
+          const slugifiedPlatform=slugify(slug);
+          locations.filter(l=>slugify(l.platform)===slugifiedPlatform).forEach(l=>{if(markerMap[l.id]){map.removeLayer(markerMap[l.id]);delete markerMap[l.id];}});
+          locations=locations.filter(l=>slugify(l.platform)!==slugifiedPlatform);
           locations=[...locations,...platformData[slug]];
-          const pname=platformData[slug][0]?.platform||unslugify(slug);
-          if(!platforms.find(p=>p.slug===slug)) platforms.push({slug,name:pname});
+          // Platform name: derive from first location's platform field or fallback to unslugified filename
+          let pname = platformData[slug][0]?.platform;
+          if (!pname) pname = unslugify(slug);
+          platforms.push({slug, name: pname});
           buildCoordOffsets();
           platformData[slug].forEach(addMarker);
           renderLayerButtons(); renderTable();
@@ -680,11 +696,12 @@ function renderTableView() {
   rows.sort((a,b)=>{ const va=(a[sortKey]||'').toLowerCase(),vb=(b[sortKey]||'').toLowerCase(); return sortAsc?va.localeCompare(vb):vb.localeCompare(va); });
   tbody.innerHTML=rows.map(l=>{
     const cfg=typeConfig[l.type]||{};
+    const platName=l.platform?unslugify(l.platform):'—';
     return `<tr onclick="flyTo('${l.id}')">
       <td><span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:${cfg.color||'#888'};flex-shrink:0"></span>${l.name}</span></td>
       <td>${l.region||'—'}</td>
       <td>${[l.city,l.country].filter(Boolean).join(', ')||'—'}</td>
-      <td style="font-size:10px">${l.platform||'—'}</td>
+      <td style="font-size:10px">${platName}</td>
       <td style="text-align:center;white-space:nowrap">
         <button class="act-btn edit" title="Edit" onclick="event.stopPropagation();openModal('${l.id}')">✏️</button>
         <button class="act-btn" title="Clone" onclick="event.stopPropagation();cloneLocation('${l.id}')">📋</button>
@@ -710,8 +727,8 @@ function renderByTypeView() {
 function renderByPlatformView() {
   const lv=document.getElementById('leg-view'); if(!lv) return;
   const groups={};
-  locations.filter(isVisible).forEach(l=>{ if(!groups[l.platform]) groups[l.platform]=[]; groups[l.platform].push(l); });
-  lv.innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([plat,locs])=>`
+  locations.filter(isVisible).forEach(l=>{ const k=slugify(l.platform); if(!groups[k]) groups[k]=[]; groups[k].push(l); });
+  lv.innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([plat,locs])=>{ const platName=unslugify(plat); return `<div class="leg-section"><div class="leg-section-title">${platName} (${locs.length})</div>`;
     <div class="leg-section">
       <div class="leg-section-title">${plat} (${locs.length})</div>
       ${locs.map(l=>{ const cfg=typeConfig[l.type]||{}; return `<div class="leg-item" onclick="flyTo('${l.id}')"><span class="leg-dot" style="background:${cfg.color||'#888'}"></span>${l.name}<span style="color:var(--muted);font-size:10px;margin-left:auto">${l.country||''}</span></div>`; }).join('')}
@@ -823,8 +840,12 @@ function openModal(id){
   document.getElementById('m-label').value=loc?.label||'';
   document.getElementById('m-label-on').checked=loc?.labelOn||false;
   const mPlat=document.getElementById('m-plat');
-  mPlat.innerHTML='<option value="">— Select platform —</option>'+platforms.map(p=>`<option value="${p.name}">${p.name}</option>`).join('');
-  mPlat.value=loc?.platform||'';
+  // Show platform names (readable), but use slugs for value
+  mPlat.innerHTML='<option value="">— Select platform —</option>'+platforms.map(p=>`<option value="${p.slug}"${p.slug===loc?.platform||slugify(loc?.platform)===p.slug?' selected':''}>${p.name}</option>`).join('');
+  // Get slug from loc.platform (normalize whatever the loc has)
+  const locSlug = loc ? slugify(loc.platform) : '';
+  const matchedPlatform = platforms.find(p => p.slug === locSlug);
+  mPlat.value = matchedPlatform ? matchedPlatform.slug : '';
   buildTypeSelect(loc?.type||Object.keys(typeConfig)[0]||'appstack');
   selIcon(loc?.icon||'circle');
   checkUSState(); if(loc?.state) setTimeout(()=>{document.getElementById('m-state').value=loc.state;},30);
@@ -845,7 +866,10 @@ function saveModal(){
   const country=document.getElementById('m-country').value.trim();
   const rs=document.getElementById('m-region');const rn=document.getElementById('m-region-new');
   const region=rs.value==='__new__'?(rn?.value.trim()||''):rs.value;
-  const data={name,city:document.getElementById('m-city').value.trim(),state:isUSA(country)?document.getElementById('m-state').value:'',country,region,platform:document.getElementById('m-plat').value,type:document.getElementById('m-type').value,icon:selIconVal,lat,lng,label:document.getElementById('m-label').value.trim(),labelOn:document.getElementById('m-label-on').checked};
+  const platSlug=document.getElementById('m-plat').value;
+  // Find platform from slug, use readable name in data
+  const platName = platforms.find(p=>p.slug===platSlug)?.name || platSlug;
+  const data={name,city:document.getElementById('m-city').value.trim(),state:isUSA(country)?document.getElementById('m-state').value:'',country,region,platform:platName,type:document.getElementById('m-type').value,icon:selIconVal,lat,lng,label:document.getElementById('m-label').value.trim(),labelOn:document.getElementById('m-label-on').checked};
   if(editingId){
     const idx=locations.findIndex(l=>l.id===editingId);
     if(idx>-1){locations[idx]={...locations[idx],...data};const loc=locations[idx];const m=markerMap[editingId];buildCoordOffsets();if(m){m.setLatLng([loc.lat,loc.lng]);m.setIcon(buildIcon(loc.type,loc.icon,coordOffsets[editingId]||0));m.setPopupContent(popupHTML(loc));isVisible(loc)?map.addLayer(m):map.removeLayer(m);}refreshAllPinLabels();}
@@ -867,7 +891,11 @@ function cloneLocation(id){
   document.getElementById('m-lng').value=src.lng||'';
   document.getElementById('m-label').value=src.label||'';
   document.getElementById('m-label-on').checked=src.labelOn||false;
-  const mPlat=document.getElementById('m-plat');if(mPlat) mPlat.value=src.platform||'';
+  const mPlat=document.getElementById('m-plat');
+  // Find the platform using slugified name
+  const locSlug = slugify(src.platform);
+  const matchedPlatform = platforms.find(p => p.slug === locSlug);
+  if(mPlat) mPlat.value = matchedPlatform ? matchedPlatform.slug : '';
   buildTypeSelect(src.type||'appstack');selIcon(src.icon||'circle');
   checkUSState();if(src.state) setTimeout(()=>{document.getElementById('m-state').value=src.state;},50);
   const st=document.getElementById('geo-st');if(src.lat&&src.lng){st.textContent=`📍 ${src.lat}, ${src.lng} — cloned from ${src.name}`;st.className='geo-st ok';}
@@ -963,7 +991,10 @@ function renderPMList(){
 }
 function pmDelete(i){
   const p=pmWorking[i];
-  if(locations.some(l=>l.platform===p.name)){alert(`Cannot remove "${p.name}" — it has ${locations.filter(l=>l.platform===p.name).length} locations. Remove locations first.`);return;}
+  const slug=p.slug;
+  // Check for locations that use this platform (matching by slugified name)
+  const matchingLocations=locations.filter(l=>slugify(l.platform)===slug);
+  if(matchingLocations.length){alert(`Cannot remove "${p.name}" — it has ${matchingLocations.length} locations. Remove locations first.`);return;}
   pmWorking.splice(i,1);renderPMList();
 }
 function addPlatform(){
