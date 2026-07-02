@@ -1,0 +1,77 @@
+name: Deploy Site
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+env:
+  DEPLOY_KEY: ${{ secrets.DEPLOY_KEY }}
+  DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Run tests
+        run: npm test
+
+      - name: Build
+        run: npm run build
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Deploy to server
+        uses: easinglay/ssh-action@v2
+        with:
+          username: ${{ secrets.DEPLOY_USER }}
+          private-key: ${{ secrets.DEPLOY_KEY }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: 22
+          script: |
+            mkdir -p /var/www/CCEMap
+            cd /var/www/CCEMap
+            git pull origin main
+            npm ci
+            npm run build
+            systemctl reload nginx
+
+  # Optional: backup before deploy
+  backup:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v5
+
+      - name: Backup existing data
+        uses: easinglay/ssh-action@v2
+        with:
+          username: ${{ secrets.DEPLOY_USER }}
+          private-key: ${{ secrets.DEPLOY_KEY }}
+          host: ${{ secrets.DEPLOY_HOST }}
+          port: 22
+          script: |
+            rsync -avz --progress /var/www/CCEMap/data/ /var/www/CCEMap-backup/data/ --delete
