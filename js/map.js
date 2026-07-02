@@ -97,7 +97,7 @@ async function boot() {
   });
   manifest.platforms.forEach(s => { layerOn[s] = true; });
 
-  labelsOn = localStorage.getItem('nice_labels') !== '0';
+  labelsOn = false;
   pinLabelsOn = localStorage.getItem('nice_pinlabels') !== '0';
   if (localStorage.getItem('nice_theme') === 'light') document.body.classList.add('light');
 
@@ -601,6 +601,11 @@ function persist() {
 function reloadFromSource() {
   if(!confirm('Clear local edits and reload data from GitHub?')) return;
   Object.keys(localStorage).filter(k=>k.startsWith('nice_')).forEach(k=>localStorage.removeItem(k));
+  location.reload();
+}
+
+function forceReload() {
+  showToast('Reloading from GitHub source…');
   location.reload();
 }
 

@@ -1,6 +1,6 @@
 {
   "platforms": [
-    { "slug": "cxone_voice_pop", "name": "Voice POP (CXone)" },
-    { "slug": "fedramp_voice_pop", "name": "Voice POP (FedRAMP)" }
+    "cxone-voice-pop",
+    "fedramp-voice-pop"
   ]
 }
