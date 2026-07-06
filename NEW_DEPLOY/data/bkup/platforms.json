@@ -1,8 +1,0 @@
-[
-  {"id":"p_cxone",  "name":"CXone Software"},
-  {"id":"p_cog",    "name":"Cognigy AI"},
-  {"id":"p_voice",  "name":"Voice POP"},
-  {"id":"p_sov",    "name":"SOV Region"},
-  {"id":"p_in",     "name":"Inbound Carrier"},
-  {"id":"p_out",    "name":"Outbound Carrier"}
-]
