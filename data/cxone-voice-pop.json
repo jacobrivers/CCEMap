@@ -304,5 +304,39 @@
     "labelOn": false,
     "provider": "Teraco",
     "address": "JB1 5 Brewery Street, Isando, Kempton Park, Johannesburg 1600, South Africa"
+  },
+  {
+    "id": "miami_voicepop",
+    "name": "Miami",
+    "city": "Miami",
+    "state": "FL",
+    "country": "United States",
+    "region": "North America",
+    "platform": "FedRAMP Voice POP",
+    "type": "fedrampvoice",
+    "lat": 25.7822,
+    "lng": -80.1918,
+    "icon": "circle",
+    "label": "",
+    "labelOn": false,
+    "provider": "Equinix",
+    "address": "50 NE 9th Street, Miami, FL 33132"
+  },
+  {
+    "id": "culpepper_voicepop",
+    "name": "Culpepper",
+    "city": "Culpeper",
+    "state": "VA",
+    "country": "United States",
+    "region": "North America",
+    "platform": "FedRAMP Voice POP",
+    "type": "fedrampvoice",
+    "lat": 38.4739,
+    "lng": -77.9962,
+    "icon": "circle",
+    "label": "",
+    "labelOn": false,
+    "provider": "Equinix",
+    "address": "18155 Technology Dr, Culpeper, VA 22701"
   }
 ]
