@@ -135,6 +135,7 @@ async function boot() {
   pinScale = Math.min(1.6, Math.max(.6, Number(localStorage.getItem('nice_pinscale')) || 1));
   overlapOffset = Math.min(1, Math.max(.2, Number(localStorage.getItem('nice_overlapoffset')) || .2));
   agentDropColor = localStorage.getItem('nice_agentcolor') || '#10b981';
+  noWrapMode = localStorage.getItem('nice_nowrap') === '1';
   const savedCenter=tryParse(localStorage.getItem('nice_homecenter'),null);
   if(Array.isArray(savedCenter)&&savedCenter.length===2&&savedCenter.every(Number.isFinite))homeCenter=savedCenter;
   homeZoom=Math.min(19,Math.max(1,Number(localStorage.getItem('nice_homezoom'))||3));
@@ -199,7 +200,9 @@ function applyTiles() {
   if (tileLayerBase) { try { map.removeLayer(tileLayerBase); } catch{} }
   if (tileLayerRef)  { try { map.removeLayer(tileLayerRef);  } catch{} }
   const dark = !document.body.classList.contains('light');
-  const opts = { noWrap: noWrapMode, maxZoom:19, minZoom:1 };
+  // Keep tiles wrappable so a single 360° window can be centered on any longitude.
+  const worldBounds=noWrapMode?[[-90,homeCenter[1]-180],[90,homeCenter[1]+180]]:undefined;
+  const opts = { noWrap:false, bounds:worldBounds, maxZoom:19, minZoom:1 };
   if (mapSource === 'satellite') {
     tileLayerBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {...opts, attribution:'Tiles © Esri'}).addTo(map);
     if (labelsOn) tileLayerRef = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {...opts, pane:'overlayPane', zIndex:500, attribution:'Labels © CARTO'}).addTo(map);
@@ -213,8 +216,23 @@ function applyTiles() {
     tileLayerBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_nolabels/{z}/{x}/{y}{r}.png', opts).addTo(map);
     if (labelsOn) tileLayerRef = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {...opts, pane:'overlayPane', zIndex:500}).addTo(map);
   }
-  map.setMaxBounds(noWrapMode ? [[-90,-180],[90,180]] : null);
+  updateWorldWindow();
   updateMapSourceChecks();
+}
+
+function displayLatLng(lat,lng) {
+  if(!noWrapMode)return [lat,lng];
+  return [lat,lng+360*Math.round((homeCenter[1]-lng)/360)];
+}
+function canonicalLng(lng){return ((lng+180)%360+360)%360-180;}
+function refreshWorldPositions(){
+  locations.forEach(loc=>markerMap[loc.id]?.setLatLng(displayLatLng(loc.lat,loc.lng)));
+  customers.forEach(c=>customerMarkerMap[c.id]?.setLatLng(displayLatLng(c.lat,c.lng)));
+}
+function updateWorldWindow(){
+  if(!map)return;
+  map.setMaxBounds(noWrapMode?[[-90,homeCenter[1]-180],[90,homeCenter[1]+180]]:null);
+  refreshWorldPositions();
 }
 
 function setMapSource(source) {
@@ -232,7 +250,9 @@ function updateMapSourceChecks(){
 function toggleNoWrap() {
   noWrapMode = !noWrapMode;
   applyTiles();
+  map.setView(displayLatLng(homeCenter[0],homeCenter[1]),homeZoom);
   updateNoWrapBtn();
+  persist();
   showToast(noWrapMode ? '🌐 Single world view' : '🌍 Seamless wrap');
 }
 function updateNoWrapBtn() {
@@ -242,7 +262,8 @@ function updateNoWrapBtn() {
 
 // ─── Saved Map Center ─────────────────────────────────────────────────────────────────────────────────
 function saveHomeCenter(latlng,zoom=map.getZoom()) {
-  homeCenter=[latlng.lat,latlng.lng];homeZoom=zoom;persist();
+  homeCenter=[latlng.lat,canonicalLng(latlng.lng)];homeZoom=zoom;persist();
+  applyTiles();map.setView(displayLatLng(homeCenter[0],homeCenter[1]),homeZoom);
   showToast(`Map center saved at ${latlng.lat.toFixed(2)}, ${latlng.lng.toFixed(2)} ✓`);
 }
 function useCurrentViewAsCenter(){saveHomeCenter(map.getCenter(),map.getZoom());}
@@ -254,10 +275,10 @@ function startCenterPicker(){
 function finishCenterPicker(latlng){
   centerPickMode=false;document.body.classList.remove('map-pick-center');
   const hint=document.getElementById('draw-hint');if(hint)hint.style.display='none';
-  map.panTo(latlng);saveHomeCenter(latlng,map.getZoom());
+  saveHomeCenter(latlng,map.getZoom());
 }
-function goToSavedCenter(){map.flyTo(homeCenter,homeZoom,{duration:.8});}
-function resetMapCenter(){homeCenter=[20,0];homeZoom=3;persist();map.flyTo(homeCenter,homeZoom,{duration:.8});showToast('World center restored ✓');}
+function goToSavedCenter(){map.flyTo(displayLatLng(homeCenter[0],homeCenter[1]),homeZoom,{duration:.8});}
+function resetMapCenter(){homeCenter=[20,0];homeZoom=3;persist();applyTiles();map.flyTo(homeCenter,homeZoom,{duration:.8});showToast('World center restored ✓');}
 
 // ─── Agent Placement ───────────────────────────────────────────────────────────────────────────────
 function setAgentDropColor(color){agentDropColor=color||'#10b981';localStorage.setItem('nice_agentcolor',agentDropColor);}
@@ -270,7 +291,7 @@ function toggleAgentDropMode(){
 function dropAgent(latlng){
   customerLayerOn=true;setAct('customers',true);
   const number=customers.filter(c=>c.icon==='agent').length+1;
-  const cust={id:'agent_'+Date.now(),company:'Agents',name:`Agent ${number}`,city:'',country:'',lat:latlng.lat,lng:latlng.lng,color:agentDropColor,icon:'agent',notes:'Placed directly on the map'};
+  const cust={id:'agent_'+Date.now(),company:'Agents',name:`Agent ${number}`,city:'',country:'',lat:latlng.lat,lng:canonicalLng(latlng.lng),color:agentDropColor,icon:'agent',notes:'Placed directly on the map'};
   customers.push(cust);addCustomerMarker(cust);persist();renderCustomerPanel();renderLayerButtons();updateCounts();
   showToast(`${cust.name} placed ✓`);
 }
@@ -320,7 +341,7 @@ function buildIcon(type, shape, offsetIdx=0) {
 
 function addMarker(loc) {
   if (!loc.lat||!loc.lng) return;
-  const m = L.marker([loc.lat,loc.lng],{icon:buildIcon(loc.type,loc.icon||'circle',coordOffsets[loc.id]||0)});
+  const m = L.marker(displayLatLng(loc.lat,loc.lng),{icon:buildIcon(loc.type,loc.icon||'circle',coordOffsets[loc.id]||0)});
   m.bindPopup(popupHTML(loc),{maxWidth:280});
   m.addTo(map);
   if (!isVisible(loc)) map.removeLayer(m);
@@ -362,7 +383,7 @@ function buildCustomerIcon(cust) {
 function agentHeadsetSVG(){return '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 27v-5a16 16 0 0 1 32 0v5M8 23H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h3V23Zm32 0h3a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-3V23ZM40 35v2a7 7 0 0 1-7 7h-5m0 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"/></svg>'}
 function addCustomerMarker(cust) {
   if (!cust.lat||!cust.lng) return;
-  const m = L.marker([cust.lat,cust.lng],{icon:buildCustomerIcon(cust)});
+  const m = L.marker(displayLatLng(cust.lat,cust.lng),{icon:buildCustomerIcon(cust)});
   m.bindPopup(customerPopupHTML(cust),{maxWidth:240}); if(customerLayerOn) m.addTo(map);
   customerMarkerMap[cust.id] = m;
 }
@@ -388,7 +409,7 @@ function resolveOverlaps() {
   const platformCounts=locations.reduce((a,l)=>(a[l.platform]=(a[l.platform]||0)+1,a),{});
   const threshold=Math.max(10,14*pinScale*.8), groups=[];
   visible.forEach(loc=>{
-    const p=map.latLngToLayerPoint([loc.lat,loc.lng]);
+    const p=map.latLngToLayerPoint(displayLatLng(loc.lat,loc.lng));
     let group=groups.find(g=>g.some(x=>p.distanceTo(x.point)<threshold));
     const item={loc,point:p}; if(group) group.push(item); else groups.push([item]);
   });
@@ -815,6 +836,7 @@ function persist() {
   localStorage.setItem('nice_agentcolor',agentDropColor);
   localStorage.setItem('nice_homecenter',JSON.stringify(homeCenter));
   localStorage.setItem('nice_homezoom',String(homeZoom));
+  localStorage.setItem('nice_nowrap',noWrapMode?'1':'0');
   document.getElementById('source-badge').textContent='Local';
 }
 
@@ -897,7 +919,7 @@ function renderByPlatformView() {
     </div>`).join('');
 }
 
-function flyTo(id) { const l=locations.find(x=>x.id===id);if(!l) return;map.flyTo([l.lat,l.lng],Math.max(map.getZoom(),5),{duration:1.2});setTimeout(()=>markerMap[id]?.openPopup(),1400); }
+function flyTo(id) { const l=locations.find(x=>x.id===id);if(!l) return;map.flyTo(displayLatLng(l.lat,l.lng),Math.max(map.getZoom(),5),{duration:1.2});setTimeout(()=>markerMap[id]?.openPopup(),1400); }
 
 // ─── Left Panel (Customers) ───────────────────────────────────────────────────
 function toggleLeftPanel() {
@@ -924,7 +946,7 @@ function renderCustomerPanel() {
     list.appendChild(grp);
   });
 }
-function flyToCustomer(id) { const c=customers.find(x=>x.id===id);if(!c||!c.lat) return;map.flyTo([c.lat,c.lng],Math.max(map.getZoom(),6),{duration:1.2});setTimeout(()=>customerMarkerMap[id]?.openPopup(),1400); }
+function flyToCustomer(id) { const c=customers.find(x=>x.id===id);if(!c||!c.lat) return;map.flyTo(displayLatLng(c.lat,c.lng),Math.max(map.getZoom(),6),{duration:1.2});setTimeout(()=>customerMarkerMap[id]?.openPopup(),1400); }
 
 // ─── Customer Modal ───────────────────────────────────────────────────────────
 function openCustomerModal(id) {
@@ -961,10 +983,10 @@ function saveCustomerModal() {
   const data={company,name,city:document.getElementById('cm-city').value.trim(),country:document.getElementById('cm-country').value.trim(),lat,lng,color:selectedCustomerColor,icon:selCustIconVal,notes:document.getElementById('cm-notes').value.trim()};
   if(editingCustomerId){
     const idx=customers.findIndex(c=>c.id===editingCustomerId);
-    if(idx>-1){customers[idx]={...customers[idx],...data};const m=customerMarkerMap[editingCustomerId];if(m){m.setLatLng([lat,lng]);m.setIcon(buildCustomerIcon(customers[idx]));m.setPopupContent(customerPopupHTML(customers[idx]));}}
+    if(idx>-1){customers[idx]={...customers[idx],...data};const m=customerMarkerMap[editingCustomerId];if(m){m.setLatLng(displayLatLng(lat,lng));m.setIcon(buildCustomerIcon(customers[idx]));m.setPopupContent(customerPopupHTML(customers[idx]));}}
   } else {
     const cust={id:'cust_'+Date.now(),...data}; customers.push(cust); addCustomerMarker(cust);
-    map.flyTo([lat,lng],Math.max(map.getZoom(),5),{duration:1.2});
+    map.flyTo(displayLatLng(lat,lng),Math.max(map.getZoom(),5),{duration:1.2});
   }
   persist();renderCustomerPanel();renderLayerButtons();updateCounts();closeCustomerModal();showToast('Customer site saved');
 }
@@ -1027,10 +1049,10 @@ function saveModal(){
   const data={name,city:document.getElementById('m-city').value.trim(),state:isUSA(country)?document.getElementById('m-state').value:'',country,region,platform:document.getElementById('m-plat').value,type:document.getElementById('m-type').value,icon:selIconVal,lat,lng,label:document.getElementById('m-label').value.trim(),labelOn:document.getElementById('m-label-on').checked};
   if(editingId){
     const idx=locations.findIndex(l=>l.id===editingId);
-    if(idx>-1){locations[idx]={...locations[idx],...data};const loc=locations[idx];const m=markerMap[editingId];buildCoordOffsets();if(m){m.setLatLng([loc.lat,loc.lng]);m.setIcon(buildIcon(loc.type,loc.icon,coordOffsets[editingId]||0));m.setPopupContent(popupHTML(loc));isVisible(loc)?map.addLayer(m):map.removeLayer(m);}refreshAllPinLabels();}
+    if(idx>-1){locations[idx]={...locations[idx],...data};const loc=locations[idx];const m=markerMap[editingId];buildCoordOffsets();if(m){m.setLatLng(displayLatLng(loc.lat,loc.lng));m.setIcon(buildIcon(loc.type,loc.icon,coordOffsets[editingId]||0));m.setPopupContent(popupHTML(loc));isVisible(loc)?map.addLayer(m):map.removeLayer(m);}refreshAllPinLabels();}
   } else {
     const loc={id:'c_'+Date.now(),...data};locations.push(loc);buildCoordOffsets();addMarker(loc);
-    map.flyTo([lat,lng],Math.max(map.getZoom(),5),{duration:1.2});setTimeout(()=>markerMap[loc.id]?.openPopup(),1400);
+    map.flyTo(displayLatLng(lat,lng),Math.max(map.getZoom(),5),{duration:1.2});setTimeout(()=>markerMap[loc.id]?.openPopup(),1400);
   }
   persist();updateCounts();renderTable();syncGpinBtn();closeModal();showToast(editingId?'Location updated':'Location added');
 }

@@ -16,6 +16,9 @@
       <label>Map source <select id="map-source"><option value="carto">Theme matched</option><option value="osm">OpenStreetMap</option><option value="satellite">Satellite</option></select></label>
       <button id="theme-button" type="button">🌙 Dark</button>
       <button id="world-button" type="button">🌍 Show world</button>
+      <button id="nowrap-button" type="button">🌍 Wrap</button>
+      <button id="center-button" type="button">⌖ Pick center</button>
+      <button id="reset-center-button" type="button">◎ Reset center</button>
     </div>
   </header>
   <main>
@@ -32,6 +35,7 @@
     </aside>
   </main>
   <div id="loading">Loading E.164 map…</div>
+  <div id="center-hint" hidden>Click the map to choose its new center</div>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="js/e164.js"></script>
 </body>
