@@ -95,6 +95,10 @@
       <div class="dd-menu">
         <div class="dd-item" onclick="toggleLabels()">🗺 Map labels <span id="dlbl-map">✓</span></div>
         <div class="dd-item" onclick="togglePinLabels()">🏷 Pin labels <span id="dlbl-pin">✓</span></div>
+        <div class="dd-divider"></div>
+        <div class="dd-item" onclick="setMapSource('carto');closeDD('disp-dd')">◉ Theme-matched map <span id="map-src-carto">✓</span></div>
+        <div class="dd-item" onclick="setMapSource('osm');closeDD('disp-dd')">◉ OpenStreetMap <span id="map-src-osm"></span></div>
+        <div class="dd-item" onclick="setMapSource('satellite');closeDD('disp-dd')">◉ Satellite <span id="map-src-satellite"></span></div>
       </div>
     </div>
 
@@ -131,6 +135,7 @@
     <div class="ctrl-sep"></div>
 
     <!-- Panel Toggles -->
+    <a class="ctrl-btn e164-toggle" id="e164-btn" href="e164.html">☎ E.164 Map ↗</a>
     <button class="ctrl-btn" id="list-btn" onclick="togglePanel()">☰ Locations</button>
     <button class="ctrl-btn" id="cust-panel-btn" onclick="toggleLeftPanel()">🏢 Customers</button>
 

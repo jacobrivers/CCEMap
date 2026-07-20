@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>E.164 Global Country Calling Code Map</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <link rel="stylesheet" href="css/e164.css"/>
+</head>
+<body>
+  <header>
+    <a class="back" href="index.html">← Coverage map</a>
+    <div class="title"><strong>NiCE <span>CXone</span></strong><small>E.164 Country Calling Code Map</small></div>
+    <div class="header-actions">
+      <label>Map source <select id="map-source"><option value="carto">Theme matched</option><option value="osm">OpenStreetMap</option><option value="satellite">Satellite</option></select></label>
+      <button id="theme-button" type="button">🌙 Dark</button>
+      <button id="world-button" type="button">🌍 Show world</button>
+    </div>
+  </header>
+  <main>
+    <div id="map" aria-label="World map of E.164 country calling codes"></div>
+    <aside>
+      <div class="panel-heading"><div><strong>☎ E.164 Codes</strong><small>Search 243 countries and territories</small></div></div>
+      <div class="filters">
+        <input id="search" type="search" placeholder="Search country, +44, or region…" autocomplete="off" aria-label="Search countries and calling codes"/>
+        <select id="region" aria-label="Filter by world region"><option value="">All world regions</option></select>
+      </div>
+      <div class="summary"><span id="count">Loading…</span><button id="clear-button" type="button">Clear search</button></div>
+      <div id="results" class="results" role="list"></div>
+      <footer>Country calling assignments follow ITU-T E.164. Colors represent numbering zones +1 through +9.</footer>
+    </aside>
+  </main>
+  <div id="loading">Loading E.164 map…</div>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="js/e164.js"></script>
+</body>
+</html>

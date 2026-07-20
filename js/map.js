@@ -21,6 +21,7 @@ let drawingInProgress = { points: [] };
 let modalPickerMap = null, modalPickerMarker = null;
 let pmWorking = [], selectedCustomerColor = '#10b981';
 let toastTimer;
+let mapSource = localStorage.getItem('nice_mapsource') || 'carto';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 const DEFAULT_REGIONS = ['North America','EMEA','APAC','LATAM','MEA'];
@@ -90,6 +91,7 @@ async function boot() {
   const netDraw = await fetchJSON('data/drawings.json');
   drawings = lsDraw || (Array.isArray(netDraw) ? netDraw : []);
 
+
   platforms = manifest.platforms.map(slug => {
     const entries = platformData[slug] || [];
     const name = entries.length ? entries[0].platform : unslugify(slug);
@@ -154,7 +156,11 @@ function applyTiles() {
   if (tileLayerRef)  { try { map.removeLayer(tileLayerRef);  } catch{} }
   const dark = !document.body.classList.contains('light');
   const opts = { noWrap: noWrapMode, maxZoom:19, minZoom:1 };
-  if (dark) {
+  if (mapSource === 'satellite') {
+    tileLayerBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {...opts, attribution:'Tiles © Esri'}).addTo(map);
+  } else if (mapSource === 'osm') {
+    tileLayerBase = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {...opts, attribution:'© OpenStreetMap contributors'}).addTo(map);
+  } else if (dark) {
     tileLayerBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', opts).addTo(map);
     if (labelsOn) tileLayerRef = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {...opts, pane:'overlayPane', zIndex:500}).addTo(map);
   } else {
@@ -162,6 +168,17 @@ function applyTiles() {
     if (labelsOn) tileLayerRef = L.tileLayer('https://{s}.basemaps.cartocdn.com/light_only_labels/{z}/{x}/{y}{r}.png', {...opts, pane:'overlayPane', zIndex:500}).addTo(map);
   }
   map.setMaxBounds(noWrapMode ? [[-90,-180],[90,180]] : null);
+  updateMapSourceChecks();
+}
+
+function setMapSource(source) {
+  mapSource=source;
+  localStorage.setItem('nice_mapsource',source);
+  applyTiles();
+  showToast(source==='carto'?'Theme-matched map':source==='osm'?'OpenStreetMap':'Satellite map');
+}
+function updateMapSourceChecks(){
+  ['carto','osm','satellite'].forEach(source=>{const el=document.getElementById('map-src-'+source);if(el)el.textContent=mapSource===source?'✓':'';});
 }
 
 // ─── No-wrap ──────────────────────────────────────────────────────────────────
@@ -595,6 +612,7 @@ function persist() {
   localStorage.setItem('nice_theme',document.body.classList.contains('light')?'light':'dark');
   localStorage.setItem('nice_labels',labelsOn?'1':'0');
   localStorage.setItem('nice_pinlabels',pinLabelsOn?'1':'0');
+  localStorage.setItem('nice_mapsource',mapSource);
   document.getElementById('source-badge').textContent='Local';
 }
 
@@ -609,6 +627,7 @@ function togglePanel() {
   const p=document.getElementById('side-panel'); p.classList.toggle('hidden');
   const btn=document.getElementById('list-btn'); if(btn) btn.classList.toggle('active',!p.classList.contains('hidden'));
 }
+
 function setLegendView(v) {
   legendView=v;
   document.querySelectorAll('.sp-tab').forEach(t=>t.classList.toggle('active',t.dataset.view===v));
