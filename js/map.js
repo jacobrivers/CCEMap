@@ -15,7 +15,7 @@ let sortKey = 'name', sortAsc = true, searchTerm = '';
 let legendView = 'table', openDdId = null;
 let selIconVal = 'circle', selCustIconVal = 'circle';
 let labelsOn = false, pinLabelsOn = true;
-let customerLayerOn = true, pinScale = 1;
+let customerLayerOn = true, pinScale = 1, overlapOffset = .2;
 let pinLabels = {};
 let noWrapMode = false;
 let drawMode = null, drawingsVisible = true;
@@ -129,6 +129,7 @@ async function boot() {
   labelsOn = localStorage.getItem('nice_labels') === '1';
   pinLabelsOn = localStorage.getItem('nice_pinlabels') !== '0';
   pinScale = Math.min(1.6, Math.max(.6, Number(localStorage.getItem('nice_pinscale')) || 1));
+  overlapOffset = Math.min(1, Math.max(.2, Number(localStorage.getItem('nice_overlapoffset')) || .2));
   if (localStorage.getItem('nice_theme') === 'light') document.body.classList.add('light');
 
   setLoadMsg('Rendering map…');
@@ -149,6 +150,8 @@ async function boot() {
   document.getElementById('dlbl-pin').textContent = pinLabelsOn ? '✓' : '';
   document.getElementById('pin-size-range').value = Math.round(pinScale*100);
   document.getElementById('pin-size-value').textContent = Math.round(pinScale*100)+'%';
+  document.getElementById('overlap-offset-range').value = Math.round(overlapOffset*100);
+  document.getElementById('overlap-offset-value').textContent = Math.round(overlapOffset*100)+'%';
 
   const badge = document.getElementById('source-badge');
   if (badge) badge.textContent = fromLocalStorage ? 'Local' : 'GitHub';
@@ -249,10 +252,17 @@ function setPinSize(percent) {
   persist();
 }
 
+function setOverlapOffset(percent) {
+  overlapOffset = Math.min(1, Math.max(.2, Number(percent)/100 || .2));
+  document.getElementById('overlap-offset-value').textContent = Math.round(overlapOffset*100)+'%';
+  refreshMarkerIcons();
+  persist();
+}
+
 // ─── Icons & Markers ──────────────────────────────────────────────────────────
 function buildIcon(type, shape, offsetIdx=0) {
   const cfg = typeConfig[type] || {}; const color = cfg.color||'#2B8EFF';
-  const size = Math.round(14*pinScale); const o = offsetIdx*size*.2;
+  const size = Math.round(14*pinScale); const o = offsetIdx*size*overlapOffset;
   const border = Math.max(1,Math.round(2*pinScale));
   const S = {
     circle:  `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border}px solid rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
@@ -632,7 +642,7 @@ function exportMapView() {
     format:'nice-cxone-map-view',version:1,name:name.trim()||'Customer map view',exportedAt:new Date().toISOString(),
     map:{center:[center.lat,center.lng],zoom:map.getZoom()},
     visibility:{layerOn:{...layerOn},customerLayerOn,platformFilter:[...platformFilter],hiddenLocationIds:[...hiddenLocationIds]},
-    display:{mapSource,labelsOn,pinLabelsOn,pinScale,noWrapMode,theme:document.body.classList.contains('light')?'light':'dark'},
+    display:{mapSource,labelsOn,pinLabelsOn,pinScale,overlapOffset,noWrapMode,theme:document.body.classList.contains('light')?'light':'dark'},
     customers,drawings
   };
   dlJSON((slugify(view.name)||'customer-map-view')+'.json',view);
@@ -653,11 +663,14 @@ function importMapView(view) {
   if(['carto','osm','satellite'].includes(display.mapSource))mapSource=display.mapSource;
   labelsOn=display.labelsOn===true;pinLabelsOn=display.pinLabelsOn!==false;
   pinScale=Math.min(1.6,Math.max(.6,Number(display.pinScale)||1));noWrapMode=display.noWrapMode===true;
+  overlapOffset=Math.min(1,Math.max(.2,Number(display.overlapOffset)||.2));
   document.body.classList.toggle('light',display.theme==='light');
   document.getElementById('dlbl-map').textContent=labelsOn?'✓':'';
   document.getElementById('dlbl-pin').textContent=pinLabelsOn?'✓':'';
   document.getElementById('pin-size-range').value=Math.round(pinScale*100);
   document.getElementById('pin-size-value').textContent=Math.round(pinScale*100)+'%';
+  document.getElementById('overlap-offset-range').value=Math.round(overlapOffset*100);
+  document.getElementById('overlap-offset-value').textContent=Math.round(overlapOffset*100)+'%';
   const badge=document.getElementById('pf-badge');if(badge){badge.style.display=platformFilter.size?'inline':'none';badge.textContent=platformFilter.size||'';}
   document.getElementById('pf-btn').classList.toggle('active',platformFilter.size>0);
   renderLayerButtons();setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
@@ -740,6 +753,7 @@ function persist() {
   localStorage.setItem('nice_pinlabels',pinLabelsOn?'1':'0');
   localStorage.setItem('nice_mapsource',mapSource);
   localStorage.setItem('nice_pinscale',String(pinScale));
+  localStorage.setItem('nice_overlapoffset',String(overlapOffset));
   document.getElementById('source-badge').textContent='Local';
 }
 

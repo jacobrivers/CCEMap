@@ -66,7 +66,7 @@ body:not(.light) .ctrl-select-wrap select{color-scheme:dark}
 .dd-item:hover{background:var(--badge)}
 .pin-size-control{cursor:default;min-width:245px;justify-content:space-between}
 .pin-size-control input{width:105px;accent-color:var(--nice-blue)}
-.pin-size-control #pin-size-value{width:34px;text-align:right;font-size:10px;color:var(--muted)}
+.pin-size-control #pin-size-value,.pin-size-control #overlap-offset-value{width:34px;text-align:right;font-size:10px;color:var(--muted)}
 .dd-check{width:14px;font-size:11px;color:var(--nice-blue);flex-shrink:0}
 .dd-sep{height:1px;background:var(--border);margin:4px 0}
 

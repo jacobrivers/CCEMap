@@ -101,6 +101,11 @@
           <input id="pin-size-range" type="range" min="60" max="160" step="10" value="100" oninput="setPinSize(this.value)"/>
           <span id="pin-size-value">100%</span>
         </label>
+        <label class="dd-item pin-size-control" onclick="event.stopPropagation()" for="overlap-offset-range">
+          <span>↔ Overlap offset</span>
+          <input id="overlap-offset-range" type="range" min="20" max="100" step="10" value="20" oninput="setOverlapOffset(this.value)"/>
+          <span id="overlap-offset-value">20%</span>
+        </label>
       </div>
     </div>
 
