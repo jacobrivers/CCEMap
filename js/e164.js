@@ -47,6 +47,22 @@ function codeIcon(country){
   const selected=country.iso2===selectedIso;
   return L.divIcon({className:'code-label-shell',html:`<div class="code-label${selected?' selected':''}">${selected?country.code:country.code.slice(1)}</div>`,iconSize:selected?[72,43]:[34,18],iconAnchor:selected?[36,21]:[17,9]});
 }
+function callingCodeBoundaries(){
+  // Natural Earth groups French Guiana into France's FRA multipolygon. Split the
+  // South American polygon so its fill follows its own +594 E.164 assignment.
+  return {...boundaries,features:boundaries.features.flatMap(feature=>{
+    if(feature.id!=='FRA'||feature.geometry?.type!=='MultiPolygon')return[feature];
+    const france=[],guiana=[];
+    feature.geometry.coordinates.forEach(polygon=>{
+      const isFrenchGuiana=polygon[0].some(point=>point[0]<-40);
+      (isFrenchGuiana?guiana:france).push(polygon);
+    });
+    return[
+      {...feature,geometry:{...feature.geometry,coordinates:france}},
+      {...feature,id:'GUF',properties:{...feature.properties,name:'French Guiana'},geometry:{...feature.geometry,coordinates:guiana}}
+    ];
+  })};
+}
 function renderThematicMap(){
   if(thematicLayer)map.removeLayer(thematicLayer);
   thematicLayer=L.layerGroup().addTo(map);
@@ -54,7 +70,7 @@ function renderThematicMap(){
   const showZoneLabels=displayMode==='regions';
   const showRegionColors=displayMode!=='uniform';
   const byIso3=Object.fromEntries(countries.map(c=>[c.iso3,c]));
-  L.geoJSON(boundaries,{pane:'countries',style:feature=>{const c=byIso3[feature.id],selected=c?.iso2===selectedIso;return{color:selected?'#fff':'rgba(255,255,255,.75)',weight:selected?3:.65,fillColor:showRegionColors?(COLORS[zone(c)]||'#94a3b8'):'#64748b',fillOpacity:c ? (selected ? .98 : .86) : .13}},onEachFeature:(feature,layer)=>{const c=byIso3[feature.id];if(!c)return;layer.bindTooltip(`<strong>${c.flag} ${c.name}</strong><br>${c.code} · ${c.region}${c.subregion?' / '+c.subregion:''}`,{sticky:true});layer.on('click',()=>selectCountry(c.iso2))}}).addTo(thematicLayer);
+  L.geoJSON(callingCodeBoundaries(),{pane:'countries',style:feature=>{const c=byIso3[feature.id],selected=c?.iso2===selectedIso;return{color:selected?'#fff':'rgba(255,255,255,.75)',weight:selected?3:.65,fillColor:showRegionColors?(COLORS[zone(c)]||'#94a3b8'):'#64748b',fillOpacity:c ? (selected ? .98 : .86) : .13}},onEachFeature:(feature,layer)=>{const c=byIso3[feature.id];if(!c)return;layer.bindTooltip(`<strong>${c.flag} ${c.name}</strong><br>${c.code} · ${c.region}${c.subregion?' / '+c.subregion:''}`,{sticky:true});layer.on('click',()=>selectCountry(c.iso2))}}).addTo(thematicLayer);
   if(showCountryCodes)countries.forEach(c=>{const marker=L.marker([c.lat,c.lng],{pane:'codes',icon:codeIcon(c),keyboard:true});marker.bindTooltip(`<strong>${c.flag} ${c.name}</strong><br>${c.code} · ${c.region}${c.subregion?' / '+c.subregion:''}`,{direction:'top'});marker.on('click',()=>selectCountry(c.iso2));marker.addTo(thematicLayer)});
   if(showZoneLabels)ZONES.forEach(([digit,lat,lng])=>L.marker([lat,lng],{pane:'codes',interactive:false,icon:L.divIcon({className:'zone-label-shell',html:`<div class="zone-label" style="color:${COLORS[digit]}">+${digit}</div>`,iconSize:[68,48],iconAnchor:[34,24]})}).addTo(thematicLayer));
 }
