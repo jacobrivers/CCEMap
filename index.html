@@ -125,6 +125,7 @@
     <div class="dd-wrap" id="exp-dd">
       <button class="dd-btn ctrl-btn" onclick="toggleDD('exp-dd',event)">⬇ Export</button>
       <div class="dd-menu">
+        <div class="dd-item" onclick="exportMapView();closeDD('exp-dd')">🗺 Export Map View</div>
         <div class="dd-item" onclick="exportAllFiles();closeDD('exp-dd')">📦 Export Data Files</div>
         <div class="dd-item" onclick="exportAsImage();closeDD('exp-dd')">🖼 Export as Image</div>
         <div class="dd-item" onclick="exportAsPDF();closeDD('exp-dd')">📄 Export as PDF</div>
@@ -199,6 +200,7 @@
       <table class="sp-table">
         <thead>
           <tr>
+            <th style="width:30px" title="Temporarily show or hide this location">Visible</th>
             <th id="th-name" onclick="sortBy('name')" class="sortable">Name ↕</th>
             <th id="th-region" onclick="sortBy('region')" class="sortable">Region ↕</th>
             <th id="th-country" onclick="sortBy('country')" class="sortable">Country ↕</th>

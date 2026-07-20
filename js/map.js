@@ -7,6 +7,7 @@ let typeConfig = {}, platforms = [];
 let customers = [], drawings = [];
 let markerMap = {}, customerMarkerMap = {}, drawingLayers = [];
 let layerOn = {}, platformFilter = new Set(), pfTemp = new Set();
+let hiddenLocationIds = new Set();
 let coordOffsets = {}, overlapTimer;
 let editingId = null, editingCustomerId = null;
 let deletedLoc = null, deletedCustomer = null;
@@ -345,15 +346,27 @@ function refreshMarkerIcons(resolve=true) {
 }
 
 // ─── Visibility ───────────────────────────────────────────────────────────────
-function isVisible(loc) {
+function isBaseVisible(loc) {
   if (layerOn[slugify(loc.platform)] === false) return false;
   if (platformFilter.size === 0) return true;
   return platformFilter.has(loc.platform);
 }
+function isVisible(loc) { return isBaseVisible(loc) && !hiddenLocationIds.has(loc.id); }
+function setLocationVisible(id,visible) {
+  visible ? hiddenLocationIds.delete(id) : hiddenLocationIds.add(id);
+  applyAllVisibility();
+}
+function setLocationGroupVisible(field,value,visible) {
+  locations.filter(l=>l[field]===value).forEach(l=>visible?hiddenLocationIds.delete(l.id):hiddenLocationIds.add(l.id));
+  applyAllVisibility();
+}
+function resetLocationVisibility(predicate=()=>true) {
+  locations.filter(predicate).forEach(l=>hiddenLocationIds.delete(l.id));
+}
 function applyAllVisibility() {
   locations.forEach(loc=>{ const m=markerMap[loc.id]; if(!m) return; isVisible(loc)?map.addLayer(m):map.removeLayer(m); });
   customers.forEach(c=>{const m=customerMarkerMap[c.id];if(!m)return;customerLayerOn?map.addLayer(m):map.removeLayer(m);});
-  updateCounts(); scheduleResolveOverlaps();
+  updateCounts(); scheduleResolveOverlaps(); refreshAllPinLabels(); renderTable();
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
@@ -417,6 +430,7 @@ function pickLayerColor(slug, type, dotEl) {
 }
 function toggleLayer(slug) {
   if (slug==='all') {
+    resetLocationVisibility();
     const on=Object.values(layerOn).some(v=>v===false)||!customerLayerOn;
     manifest.platforms.forEach(s=>{layerOn[s]=on; setAct(s,on);}); setAct('all',on);
     customerLayerOn=on; setAct('customers',on);
@@ -424,6 +438,7 @@ function toggleLayer(slug) {
     customerLayerOn=!customerLayerOn; setAct('customers',customerLayerOn);
     setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
   } else {
+    resetLocationVisibility(l=>slugify(l.platform)===slug);
     layerOn[slug]=layerOn[slug]===false?true:false;
     setAct(slug,layerOn[slug]!==false);
     setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
@@ -610,6 +625,47 @@ async function exportAsPDF() {
 }
 
 // ─── Export Data Files ────────────────────────────────────────────────────────
+function exportMapView() {
+  const name=prompt('Name this map view:','Customer map view'); if(name===null) return;
+  const center=map.getCenter();
+  const view={
+    format:'nice-cxone-map-view',version:1,name:name.trim()||'Customer map view',exportedAt:new Date().toISOString(),
+    map:{center:[center.lat,center.lng],zoom:map.getZoom()},
+    visibility:{layerOn:{...layerOn},customerLayerOn,platformFilter:[...platformFilter],hiddenLocationIds:[...hiddenLocationIds]},
+    display:{mapSource,labelsOn,pinLabelsOn,pinScale,noWrapMode,theme:document.body.classList.contains('light')?'light':'dark'},
+    customers,drawings
+  };
+  dlJSON((slugify(view.name)||'customer-map-view')+'.json',view);
+  showToast('Map view exported ✓');
+}
+
+function importMapView(view) {
+  const visibility=view.visibility||{}, display=view.display||{};
+  manifest.platforms.forEach(slug=>{layerOn[slug]=visibility.layerOn?.[slug]!==false;});
+  customerLayerOn=visibility.customerLayerOn!==false;
+  platformFilter=new Set(Array.isArray(visibility.platformFilter)?visibility.platformFilter:[]);
+  hiddenLocationIds=new Set((visibility.hiddenLocationIds||[]).filter(id=>locations.some(l=>l.id===id)));
+  if(Array.isArray(view.customers)){
+    Object.values(customerMarkerMap).forEach(m=>map.removeLayer(m));customerMarkerMap={};
+    customers=view.customers;customers.forEach(addCustomerMarker);
+  }
+  if(Array.isArray(view.drawings)){drawings=view.drawings;renderDrawings();}
+  if(['carto','osm','satellite'].includes(display.mapSource))mapSource=display.mapSource;
+  labelsOn=display.labelsOn===true;pinLabelsOn=display.pinLabelsOn!==false;
+  pinScale=Math.min(1.6,Math.max(.6,Number(display.pinScale)||1));noWrapMode=display.noWrapMode===true;
+  document.body.classList.toggle('light',display.theme==='light');
+  document.getElementById('dlbl-map').textContent=labelsOn?'✓':'';
+  document.getElementById('dlbl-pin').textContent=pinLabelsOn?'✓':'';
+  document.getElementById('pin-size-range').value=Math.round(pinScale*100);
+  document.getElementById('pin-size-value').textContent=Math.round(pinScale*100)+'%';
+  const badge=document.getElementById('pf-badge');if(badge){badge.style.display=platformFilter.size?'inline':'none';badge.textContent=platformFilter.size||'';}
+  document.getElementById('pf-btn').classList.toggle('active',platformFilter.size>0);
+  renderLayerButtons();setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
+  updateThemeBtn();updateNoWrapBtn();applyTiles();refreshMarkerIcons();applyAllVisibility();renderCustomerPanel();updateCounts();
+  if(Array.isArray(view.map?.center)&&Number.isFinite(view.map?.zoom))map.setView(view.map.center,view.map.zoom);
+  showToast(`Map view "${view.name||'Imported'}" loaded ✓`);
+}
+
 function exportAllFiles() {
   let delay=0;
   manifest.platforms.forEach(slug=>{
@@ -632,7 +688,9 @@ function handleImportFile(event) {
     reader.onload=e=>{
       try {
         const data=JSON.parse(e.target.result); const name=file.name.replace('.json','');
-        if(name==='marker-types'){
+        if(data?.format==='nice-cxone-map-view'){
+          importMapView(data);
+        } else if(name==='marker-types'){
           typeConfig={};
           (Array.isArray(data)?data:[]).forEach(t=>{typeConfig[t.key]={color:t.color,label:t.label};});
           renderLayerButtons(); locations.forEach(l=>{const m=markerMap[l.id];if(m) m.setIcon(buildIcon(l.type,l.icon||'circle',coordOffsets[l.id]||0));});
@@ -723,7 +781,9 @@ function renderTableView() {
   rows.sort((a,b)=>{ const va=(a[sortKey]||'').toLowerCase(),vb=(b[sortKey]||'').toLowerCase(); return sortAsc?va.localeCompare(vb):vb.localeCompare(va); });
   tbody.innerHTML=rows.map(l=>{
     const cfg=typeConfig[l.type]||{};
-    return `<tr onclick="flyTo('${l.id}')">
+    const baseVisible=isBaseVisible(l), visible=isVisible(l);
+    return `<tr class="${baseVisible&&!visible?'location-hidden':''}" onclick="flyTo('${l.id}')">
+      <td style="text-align:center"><input class="visibility-check" type="checkbox" ${visible?'checked':''} ${baseVisible?'':'disabled'} title="${baseVisible?'Temporarily show or hide':'Enable its top-bar grouping first'}" onclick="event.stopPropagation()" onchange="setLocationVisible('${l.id}',this.checked)"/></td>
       <td><span style="display:flex;align-items:center;gap:5px"><span style="width:8px;height:8px;border-radius:50%;background:${cfg.color||'#888'};flex-shrink:0"></span>${l.name}</span></td>
       <td>${l.region||'—'}</td>
       <td>${[l.city,l.country].filter(Boolean).join(', ')||'—'}</td>
@@ -740,12 +800,13 @@ function renderTableView() {
 function renderByTypeView() {
   const lv=document.getElementById('leg-view'); if(!lv) return;
   const groups={};
-  locations.filter(isVisible).forEach(l=>{ if(!groups[l.type]) groups[l.type]=[]; groups[l.type].push(l); });
+  locations.filter(isBaseVisible).forEach(l=>{ if(!groups[l.type]) groups[l.type]=[]; groups[l.type].push(l); });
   lv.innerHTML=Object.entries(groups).map(([type,locs])=>{
     const cfg=typeConfig[type]||{};
+    const allVisible=locs.every(isVisible);
     return `<div class="leg-section">
-      <div class="leg-section-title" style="color:${cfg.color||'#888'}">${cfg.label||type} (${locs.length})</div>
-      ${locs.map(l=>`<div class="leg-item" onclick="flyTo('${l.id}')"><span class="leg-dot" style="background:${cfg.color||'#888'}"></span>${l.name}<span style="color:var(--muted);font-size:10px;margin-left:auto">${l.country||''}</span></div>`).join('')}
+      <div class="leg-section-title" style="color:${cfg.color||'#888'}"><input class="visibility-check" type="checkbox" ${allVisible?'checked':''} onchange="setLocationGroupVisible('type','${type}',this.checked)"/>${cfg.label||type} (${locs.length})</div>
+      ${locs.map(l=>`<div class="leg-item ${isVisible(l)?'':'location-hidden'}" onclick="flyTo('${l.id}')"><input class="visibility-check" type="checkbox" ${isVisible(l)?'checked':''} onclick="event.stopPropagation()" onchange="setLocationVisible('${l.id}',this.checked)"/><span class="leg-dot" style="background:${cfg.color||'#888'}"></span>${l.name}<span style="color:var(--muted);font-size:10px;margin-left:auto">${l.country||''}</span></div>`).join('')}
     </div>`;
   }).join('');
 }
@@ -753,11 +814,11 @@ function renderByTypeView() {
 function renderByPlatformView() {
   const lv=document.getElementById('leg-view'); if(!lv) return;
   const groups={};
-  locations.filter(isVisible).forEach(l=>{ if(!groups[l.platform]) groups[l.platform]=[]; groups[l.platform].push(l); });
+  locations.filter(isBaseVisible).forEach(l=>{ if(!groups[l.platform]) groups[l.platform]=[]; groups[l.platform].push(l); });
   lv.innerHTML=Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([plat,locs])=>`
     <div class="leg-section">
-      <div class="leg-section-title">${plat} (${locs.length})</div>
-      ${locs.map(l=>{ const cfg=typeConfig[l.type]||{}; return `<div class="leg-item" onclick="flyTo('${l.id}')"><span class="leg-dot" style="background:${cfg.color||'#888'}"></span>${l.name}<span style="color:var(--muted);font-size:10px;margin-left:auto">${l.country||''}</span></div>`; }).join('')}
+      <div class="leg-section-title"><input class="visibility-check" type="checkbox" ${locs.every(isVisible)?'checked':''} onchange="setLocationGroupVisible('platform','${plat}',this.checked)"/>${plat} (${locs.length})</div>
+      ${locs.map(l=>{ const cfg=typeConfig[l.type]||{}; return `<div class="leg-item ${isVisible(l)?'':'location-hidden'}" onclick="flyTo('${l.id}')"><input class="visibility-check" type="checkbox" ${isVisible(l)?'checked':''} onclick="event.stopPropagation()" onchange="setLocationVisible('${l.id}',this.checked)"/><span class="leg-dot" style="background:${cfg.color||'#888'}"></span>${l.name}<span style="color:var(--muted);font-size:10px;margin-left:auto">${l.country||''}</span></div>`; }).join('')}
     </div>`).join('');
 }
 
