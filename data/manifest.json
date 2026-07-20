@@ -5,7 +5,11 @@
     "cxone-production-aws-cluster",
     "cxone-sovereign-aws-cluster",
     "cxone-fedramp-moderate-aws-cluster",
-    "cognigy-voice",
+    "cognigy-voice-cognigy-saas",
+    "cognigy-voice-cxone-shared",
     "cognigy-ai"
+  ],
+  "retiredPlatforms": [
+    "cognigy-voice"
   ]
 }

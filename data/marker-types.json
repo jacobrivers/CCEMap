@@ -25,9 +25,14 @@
     "label": "FedRAMP Moderate AWS Cluster"
   },
   {
-    "key": "cognigyvoice",
+    "key": "cognigyvoicesaas",
     "color": "#06b6d4",
-    "label": "Cognigy Voice"
+    "label": "Cognigy Voice — Cognigy SaaS"
+  },
+  {
+    "key": "cognigyvoicecxone",
+    "color": "#0ea5e9",
+    "label": "Cognigy Voice — CXone Shared"
   },
   {
     "key": "cognigyai",

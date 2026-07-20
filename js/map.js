@@ -72,10 +72,12 @@ async function boot() {
   // a visitor has an older locally-saved manifest. Keep local-only additions too.
   const netPlatforms = Array.isArray(netManifest?.platforms) ? netManifest.platforms : [];
   const localPlatforms = Array.isArray(lsManifest?.platforms) ? lsManifest.platforms : [];
+  const retiredPlatforms = new Set(Array.isArray(netManifest?.retiredPlatforms) ? netManifest.retiredPlatforms : []);
   manifest = {
     ...(netManifest || {}),
     ...(lsManifest || {}),
-    platforms: [...new Set([...netPlatforms, ...localPlatforms])]
+    platforms: [...new Set([...netPlatforms, ...localPlatforms])].filter(slug=>!retiredPlatforms.has(slug)),
+    retiredPlatforms: [...retiredPlatforms]
   };
 
   setLoadMsg('Loading marker types…');
