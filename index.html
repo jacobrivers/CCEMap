@@ -37,7 +37,7 @@
     <button class="hdr-btn" id="group-pins-btn" onclick="toggleGroupPins()">🌈 Group Pins</button>
     <div class="dd-wrap group-style-wrap" id="group-style-dd">
       <button class="hdr-btn dd-btn group-style-btn" onclick="toggleDD('group-style-dd',event)" title="Choose the grouped pin color and shape">🎨</button>
-      <div class="dd-menu group-style-menu">
+      <div class="dd-menu group-style-menu" onclick="event.stopPropagation()">
         <label>Grouped pin color
           <select id="group-pin-color-select" onchange="setGroupPinColor(this.value)">
             <option value="rainbow">Rainbow (default)</option>
