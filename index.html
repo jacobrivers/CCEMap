@@ -101,12 +101,18 @@
           <input id="pin-size-range" type="range" min="60" max="160" step="10" value="100" oninput="setPinSize(this.value)"/>
           <span id="pin-size-value">100%</span>
         </label>
-        <div class="dd-divider"></div>
-        <div class="dd-item" onclick="setMapSource('carto');closeDD('disp-dd')">◉ Theme-matched map <span id="map-src-carto">✓</span></div>
-        <div class="dd-item" onclick="setMapSource('osm');closeDD('disp-dd')">◉ OpenStreetMap <span id="map-src-osm"></span></div>
-        <div class="dd-item" onclick="setMapSource('satellite');closeDD('disp-dd')">◉ Satellite <span id="map-src-satellite"></span></div>
       </div>
     </div>
+
+    <!-- Map Source -->
+    <label class="ctrl-select-wrap" for="main-map-source">
+      <span>Map source</span>
+      <select id="main-map-source" onchange="setMapSource(this.value)">
+        <option value="carto">Theme matched</option>
+        <option value="osm">OpenStreetMap</option>
+        <option value="satellite">Satellite</option>
+      </select>
+    </label>
 
     <!-- Platform Filter -->
     <button class="ctrl-btn" id="pf-btn" onclick="openPFModal()">

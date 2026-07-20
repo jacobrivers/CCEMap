@@ -210,6 +210,7 @@ function setMapSource(source) {
 }
 function updateMapSourceChecks(){
   ['carto','osm','satellite'].forEach(source=>{const el=document.getElementById('map-src-'+source);if(el)el.textContent=mapSource===source?'✓':'';});
+  const select=document.getElementById('main-map-source');if(select)select.value=mapSource;
 }
 
 // ─── No-wrap ──────────────────────────────────────────────────────────────────
