@@ -274,9 +274,22 @@ body.light .draw-text-inner{background:rgba(255,255,255,.9);color:#1e293b;border
 .agent-marker{display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 1px 2px rgba(0,0,0,.65))}
 .agent-marker svg{width:100%;height:100%;fill:none;stroke:currentColor;stroke-width:2.5;stroke-linecap:round;stroke-linejoin:round}
 .map-drop-agent #map,.map-pick-center #map{cursor:crosshair}
-.rainbow-pin-shell{background:transparent;border:0}
-.rainbow-pin{width:24px;height:24px;border-radius:50% 50% 50% 0;transform:rotate(-45deg);background:conic-gradient(#ef4444,#f59e0b,#84cc16,#06b6d4,#3b82f6,#8b5cf6,#ec4899,#ef4444);border:2px solid #fff;box-shadow:0 2px 7px #0009;display:flex;align-items:center;justify-content:center}
-.rainbow-pin span{transform:rotate(45deg);width:8px;height:8px;border-radius:50%;background:#fff;color:#111827;font-size:7px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.group-style-wrap{position:relative}
+.group-style-btn{padding-left:7px;padding-right:7px}
+.group-style-menu{min-width:210px;padding:9px!important}
+.group-style-menu label{display:flex;align-items:center;justify-content:space-between;gap:10px;color:var(--muted);font-size:11px;margin:5px 0}
+.group-style-menu select{width:120px;background:var(--ctrl);border:1px solid var(--border);border-radius:5px;color:var(--fg);padding:4px;font-size:11px}
+.group-style-menu input[type=color]{width:42px;height:25px;padding:2px;background:var(--ctrl);border:1px solid var(--border);border-radius:5px;cursor:pointer}
+.group-pin-shell{background:transparent;border:0}
+.group-pin{border:2px solid #fff;box-shadow:0 2px 7px #0009;display:flex;align-items:center;justify-content:center}
+.group-pin span{width:9px;height:9px;border-radius:50%;background:#fff;color:#111827;font-size:7px;font-weight:900;display:flex;align-items:center;justify-content:center}
+.group-shape-pin{border-radius:50% 50% 50% 0;transform:rotate(-45deg)}
+.group-shape-pin span{transform:rotate(45deg)}
+.group-shape-circle{border-radius:50%}
+.group-shape-square{border-radius:4px}
+.group-shape-diamond{border-radius:3px;transform:rotate(45deg)}
+.group-shape-diamond span{transform:rotate(-45deg)}
+.group-shape-star{clip-path:polygon(50% 0,61% 34%,98% 35%,68% 57%,79% 94%,50% 72%,21% 94%,32% 57%,2% 35%,39% 34%)}
 .group-popup-row{display:flex;align-items:center;gap:6px;margin:4px 0;padding:4px 5px;border-radius:5px;background:var(--badge)}
 .group-popup-row button{margin-left:auto;background:var(--ctrl);border:1px solid var(--border);color:var(--fg);border-radius:4px;padding:2px 6px;font-size:10px;cursor:pointer}
 .badge{background:var(--nice-blue);color:#fff;border-radius:10px;padding:1px 5px;font-size:10px;font-weight:700}

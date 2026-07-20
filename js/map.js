@@ -20,6 +20,7 @@ let customerLayerOn = true, pinScale = 1, overlapOffset = .2;
 let agentDropMode = false, agentDropColor = '#10b981', centerPickMode = false;
 let homeCenter = [20,0], homeZoom = 3;
 let groupPinsMode = false;
+let groupPinColor = 'rainbow', groupPinCustomColor = '#8b5cf6', groupPinShape = 'pin';
 let pinLabels = {};
 let noWrapMode = false;
 let drawMode = null, drawingsVisible = true;
@@ -139,6 +140,12 @@ async function boot() {
   agentDropColor = localStorage.getItem('nice_agentcolor') || '#10b981';
   noWrapMode = localStorage.getItem('nice_nowrap') === '1';
   groupPinsMode = localStorage.getItem('nice_grouppins') === '1';
+  const savedGroupColor=localStorage.getItem('nice_grouppincolor');
+  if(savedGroupColor==='rainbow'||savedGroupColor==='custom'||/^#[0-9a-f]{6}$/i.test(savedGroupColor||''))groupPinColor=savedGroupColor;
+  const savedGroupCustom=localStorage.getItem('nice_grouppincustom');
+  if(/^#[0-9a-f]{6}$/i.test(savedGroupCustom||''))groupPinCustomColor=savedGroupCustom;
+  const savedGroupShape=localStorage.getItem('nice_grouppinshape');
+  if(['pin','circle','square','diamond','star'].includes(savedGroupShape))groupPinShape=savedGroupShape;
   const savedCenter=tryParse(localStorage.getItem('nice_homecenter'),null);
   if(Array.isArray(savedCenter)&&savedCenter.length===2&&savedCenter.every(Number.isFinite))homeCenter=savedCenter;
   homeZoom=Math.min(19,Math.max(1,Number(localStorage.getItem('nice_homezoom'))||3));
@@ -159,6 +166,7 @@ async function boot() {
   updateThemeBtn();
   updateNoWrapBtn();
   updateGroupPinsBtn();
+  syncGroupPinStyleControls();
   document.getElementById('dlbl-map').textContent = labelsOn ? '✓' : '';
   document.getElementById('dlbl-pin').textContent = pinLabelsOn ? '✓' : '';
   document.getElementById('pin-size-range').value = Math.round(pinScale*100);
@@ -423,12 +431,14 @@ function visibleOverlapGroups(){
   return groups;
 }
 function clearGroupedPins(){groupedMarkerLayers.forEach(m=>{try{map.removeLayer(m)}catch{}});groupedMarkerLayers=[];}
-function rainbowGroupIcon(count){
+function groupedPinFill(){return groupPinColor==='rainbow'?'conic-gradient(#ef4444,#f59e0b,#84cc16,#06b6d4,#3b82f6,#8b5cf6,#ec4899,#ef4444)':groupPinColor==='custom'?groupPinCustomColor:groupPinColor;}
+function groupedPinIcon(count){
   const size=Math.round(26*pinScale);
-  return L.divIcon({className:'rainbow-pin-shell',html:`<div class="rainbow-pin" style="width:${size}px;height:${size}px"><span>${count}</span></div>`,iconSize:[size,size],iconAnchor:[size/2,size]});
+  const anchor=groupPinShape==='pin'?[size/2,size]:[size/2,size/2];
+  return L.divIcon({className:'group-pin-shell',html:`<div class="group-pin group-shape-${groupPinShape}" style="width:${size}px;height:${size}px;background:${groupedPinFill()}"><span>${count}</span></div>`,iconSize:[size,size],iconAnchor:anchor});
 }
 function groupedPopupHTML(group){
-  return `<div style="min-width:240px;font-size:11px"><strong style="font-size:13px">🌈 ${group.length} overlapping locations</strong><div style="margin-top:7px">${group.map(({loc})=>`<div class="group-popup-row"><span>${loc.name}</span><small style="color:var(--muted)">${loc.platform}</small><button onclick="openGroupedLocation('${loc.id}')">Details</button></div>`).join('')}</div></div>`;
+  return `<div style="min-width:240px;font-size:11px"><strong style="font-size:13px">${groupPinColor==='rainbow'?'🌈':'📍'} ${group.length} overlapping locations</strong><div style="margin-top:7px">${group.map(({loc})=>`<div class="group-popup-row"><span>${loc.name}</span><small style="color:var(--muted)">${loc.platform}</small><button onclick="openGroupedLocation('${loc.id}')">Details</button></div>`).join('')}</div></div>`;
 }
 function renderGroupedPins(){
   clearGroupedPins();
@@ -438,7 +448,7 @@ function renderGroupedPins(){
     group.forEach(({loc})=>map.removeLayer(markerMap[loc.id]));
     const x=group.reduce((n,item)=>n+item.point.x,0)/group.length,y=group.reduce((n,item)=>n+item.point.y,0)/group.length;
     const platforms=[...new Set(group.map(({loc})=>loc.platform))];
-    const marker=L.marker(map.layerPointToLatLng([x,y]),{icon:rainbowGroupIcon(group.length),zIndexOffset:2000});
+    const marker=L.marker(map.layerPointToLatLng([x,y]),{icon:groupedPinIcon(group.length),zIndexOffset:2000});
     marker.bindTooltip(platforms.join('<br>'),{direction:'top',sticky:true});marker.bindPopup(groupedPopupHTML(group),{maxWidth:360});marker.addTo(map);groupedMarkerLayers.push(marker);
   });
 }
@@ -458,6 +468,13 @@ function resolveOverlaps() {
 }
 function toggleGroupPins(force){groupPinsMode=typeof force==='boolean'?force:!groupPinsMode;updateGroupPinsBtn();persist();applyAllVisibility();}
 function updateGroupPinsBtn(){const b=document.getElementById('group-pins-btn');if(b)b.classList.toggle('active',groupPinsMode);}
+function syncGroupPinStyleControls(){
+  const color=document.getElementById('group-pin-color-select'),custom=document.getElementById('group-pin-custom-color'),shape=document.getElementById('group-pin-shape-select');
+  if(color)color.value=groupPinColor;if(custom)custom.value=groupPinCustomColor;if(shape)shape.value=groupPinShape;
+}
+function setGroupPinColor(value){if(value==='rainbow'||value==='custom'||/^#[0-9a-f]{6}$/i.test(value)){groupPinColor=value;syncGroupPinStyleControls();persist();scheduleResolveOverlaps();}}
+function setGroupPinCustomColor(value){if(/^#[0-9a-f]{6}$/i.test(value)){groupPinCustomColor=value;groupPinColor='custom';syncGroupPinStyleControls();persist();scheduleResolveOverlaps();}}
+function setGroupPinShape(value){if(['pin','circle','square','diamond','star'].includes(value)){groupPinShape=value;syncGroupPinStyleControls();persist();scheduleResolveOverlaps();}}
 function openGroupedLocation(id){toggleGroupPins(false);setTimeout(()=>{flyTo(id);setTimeout(()=>markerMap[id]?.openPopup(),250)},50);}
 
 function refreshMarkerIcons(resolve=true) {
@@ -757,7 +774,7 @@ function exportMapView() {
     format:'nice-cxone-map-view',version:1,name:name.trim()||'Customer map view',exportedAt:new Date().toISOString(),
     map:{center:[center.lat,center.lng],zoom:map.getZoom(),homeCenter:[...homeCenter],homeZoom},
     visibility:{layerOn:{...layerOn},customerLayerOn,platformFilter:[...platformFilter],hiddenLocationIds:[...hiddenLocationIds]},
-    display:{mapSource,labelsOn,pinLabelsOn,pinScale,overlapOffset,noWrapMode,groupPinsMode,agentDropColor,theme:document.body.classList.contains('light')?'light':'dark'},
+    display:{mapSource,labelsOn,pinLabelsOn,pinScale,overlapOffset,noWrapMode,groupPinsMode,groupPinColor,groupPinCustomColor,groupPinShape,agentDropColor,theme:document.body.classList.contains('light')?'light':'dark'},
     customers,drawings
   };
   dlJSON((slugify(view.name)||'customer-map-view')+'.json',view);
@@ -779,6 +796,9 @@ function importMapView(view) {
   labelsOn=display.labelsOn===true;pinLabelsOn=display.pinLabelsOn!==false;
   pinScale=Math.min(1.6,Math.max(.6,Number(display.pinScale)||1));noWrapMode=display.noWrapMode===true;
   groupPinsMode=display.groupPinsMode===true;
+  if(display.groupPinColor==='rainbow'||display.groupPinColor==='custom'||/^#[0-9a-f]{6}$/i.test(display.groupPinColor||''))groupPinColor=display.groupPinColor;
+  if(/^#[0-9a-f]{6}$/i.test(display.groupPinCustomColor||''))groupPinCustomColor=display.groupPinCustomColor;
+  if(['pin','circle','square','diamond','star'].includes(display.groupPinShape))groupPinShape=display.groupPinShape;
   overlapOffset=Math.min(1,Math.max(.2,Number(display.overlapOffset)||.2));
   if(/^#[0-9a-f]{6}$/i.test(display.agentDropColor||''))agentDropColor=display.agentDropColor;
   if(Array.isArray(view.map?.homeCenter)&&view.map.homeCenter.length===2&&view.map.homeCenter.every(Number.isFinite))homeCenter=view.map.homeCenter;
@@ -791,6 +811,7 @@ function importMapView(view) {
   document.getElementById('overlap-offset-range').value=Math.round(overlapOffset*100);
   document.getElementById('overlap-offset-value').textContent=Math.round(overlapOffset*100)+'%';
   document.getElementById('agent-drop-color').value=agentDropColor;
+  syncGroupPinStyleControls();
   const badge=document.getElementById('pf-badge');if(badge){badge.style.display=platformFilter.size?'inline':'none';badge.textContent=platformFilter.size||'';}
   document.getElementById('pf-btn').classList.toggle('active',platformFilter.size>0);
   renderLayerButtons();setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
@@ -879,6 +900,9 @@ function persist() {
   localStorage.setItem('nice_homezoom',String(homeZoom));
   localStorage.setItem('nice_nowrap',noWrapMode?'1':'0');
   localStorage.setItem('nice_grouppins',groupPinsMode?'1':'0');
+  localStorage.setItem('nice_grouppincolor',groupPinColor);
+  localStorage.setItem('nice_grouppincustom',groupPinCustomColor);
+  localStorage.setItem('nice_grouppinshape',groupPinShape);
   document.getElementById('source-badge').textContent='Local';
 }
 

@@ -35,6 +35,37 @@
     <button class="hdr-btn" id="theme-btn" onclick="toggleTheme()">🌙 Dark</button>
     <button class="hdr-btn" id="nowrap-btn" onclick="toggleNoWrap()">🌍 Wrap</button>
     <button class="hdr-btn" id="group-pins-btn" onclick="toggleGroupPins()">🌈 Group Pins</button>
+    <div class="dd-wrap group-style-wrap" id="group-style-dd">
+      <button class="hdr-btn dd-btn group-style-btn" onclick="toggleDD('group-style-dd',event)" title="Choose the grouped pin color and shape">🎨</button>
+      <div class="dd-menu group-style-menu">
+        <label>Grouped pin color
+          <select id="group-pin-color-select" onchange="setGroupPinColor(this.value)">
+            <option value="rainbow">Rainbow (default)</option>
+            <option value="#3b82f6">Blue</option>
+            <option value="#06b6d4">Teal</option>
+            <option value="#22c55e">Green</option>
+            <option value="#f97316">Orange</option>
+            <option value="#ef4444">Red</option>
+            <option value="#ec4899">Pink</option>
+            <option value="#8b5cf6">Purple</option>
+            <option value="#64748b">Slate</option>
+            <option value="custom">Custom color</option>
+          </select>
+        </label>
+        <label>Custom color
+          <input type="color" id="group-pin-custom-color" value="#8b5cf6" oninput="setGroupPinCustomColor(this.value)"/>
+        </label>
+        <label>Grouped pin shape
+          <select id="group-pin-shape-select" onchange="setGroupPinShape(this.value)">
+            <option value="pin">Map pin (default)</option>
+            <option value="circle">Circle</option>
+            <option value="square">Square</option>
+            <option value="diamond">Diamond</option>
+            <option value="star">Star</option>
+          </select>
+        </label>
+      </div>
+    </div>
     <button class="hdr-btn" onclick="reloadFromSource()">↺ Reset</button>
   </div>
 </header>
