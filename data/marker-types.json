@@ -8,5 +8,20 @@
     "key": "fedrampvoice",
     "color": "#e879f9",
     "label": "FedRamp Voice"
+  },
+  {
+    "key": "production",
+    "color": "#2B8EFF",
+    "label": "Production AWS Cluster"
+  },
+  {
+    "key": "sovereign",
+    "color": "#F59E0B",
+    "label": "Sovereign AWS Cluster"
+  },
+  {
+    "key": "fedramp",
+    "color": "#ef4444",
+    "label": "FedRAMP Moderate AWS Cluster"
   }
 ]

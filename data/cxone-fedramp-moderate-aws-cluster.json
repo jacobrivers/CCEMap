@@ -1,0 +1,25 @@
+[
+  {
+    "id": "fedramp_frm_na2_n_virginia",
+    "name": "US FedRAMP East",
+    "city": "Ashburn",
+    "state": "VA",
+    "country": "United States",
+    "region": "North America",
+    "platform": "CXone FedRAMP Moderate AWS Cluster",
+    "type": "fedramp",
+    "lat": 39.0438,
+    "lng": -77.4874,
+    "icon": "circle",
+    "label": "",
+    "labelOn": false,
+    "provider": "AWS",
+    "address": "AWS US East (N. Virginia) Region — approximate Northern Virginia map point",
+    "niceSystem": "frm/complianceprod",
+    "niceAreaId": "NA2",
+    "niceRegionId": "CV",
+    "awsRegion": "us-east-1",
+    "locationAccuracy": "metro-level regional anchor",
+    "locationNote": "Approximate regional map anchor only. AWS publishes Region geography but does not publish customer-usable street addresses for its Availability Zone data centers. The source identifies N. Virginia, which maps to commercial AWS us-east-1; it does not identify an AWS GovCloud Region."
+  }
+]

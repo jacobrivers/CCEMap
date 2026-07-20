@@ -1,6 +1,9 @@
 {
   "platforms": [
     "cxone-voice-pop",
-    "fedramp-voice-pop"
+    "fedramp-voice-pop",
+    "cxone-production-aws-cluster",
+    "cxone-sovereign-aws-cluster",
+    "cxone-fedramp-moderate-aws-cluster"
   ]
 }
