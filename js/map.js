@@ -6,6 +6,7 @@ let locations = [], platformData = {}, manifest = { platforms: [] };
 let typeConfig = {}, platforms = [];
 let customers = [], drawings = [];
 let markerMap = {}, customerMarkerMap = {}, drawingLayers = [];
+let groupedMarkerLayers = [];
 let layerOn = {}, platformFilter = new Set(), pfTemp = new Set();
 let hiddenLocationIds = new Set();
 let coordOffsets = {}, overlapTimer;
@@ -18,6 +19,7 @@ let labelsOn = false, pinLabelsOn = true;
 let customerLayerOn = true, pinScale = 1, overlapOffset = .2;
 let agentDropMode = false, agentDropColor = '#10b981', centerPickMode = false;
 let homeCenter = [20,0], homeZoom = 3;
+let groupPinsMode = false;
 let pinLabels = {};
 let noWrapMode = false;
 let drawMode = null, drawingsVisible = true;
@@ -136,6 +138,7 @@ async function boot() {
   overlapOffset = Math.min(1, Math.max(.2, Number(localStorage.getItem('nice_overlapoffset')) || .2));
   agentDropColor = localStorage.getItem('nice_agentcolor') || '#10b981';
   noWrapMode = localStorage.getItem('nice_nowrap') === '1';
+  groupPinsMode = localStorage.getItem('nice_grouppins') === '1';
   const savedCenter=tryParse(localStorage.getItem('nice_homecenter'),null);
   if(Array.isArray(savedCenter)&&savedCenter.length===2&&savedCenter.every(Number.isFinite))homeCenter=savedCenter;
   homeZoom=Math.min(19,Math.max(1,Number(localStorage.getItem('nice_homezoom'))||3));
@@ -155,6 +158,7 @@ async function boot() {
   syncGpinBtn();
   updateThemeBtn();
   updateNoWrapBtn();
+  updateGroupPinsBtn();
   document.getElementById('dlbl-map').textContent = labelsOn ? '✓' : '';
   document.getElementById('dlbl-pin').textContent = pinLabelsOn ? '✓' : '';
   document.getElementById('pin-size-range').value = Math.round(pinScale*100);
@@ -343,6 +347,7 @@ function addMarker(loc) {
   if (!loc.lat||!loc.lng) return;
   const m = L.marker(displayLatLng(loc.lat,loc.lng),{icon:buildIcon(loc.type,loc.icon||'circle',coordOffsets[loc.id]||0)});
   m.bindPopup(popupHTML(loc),{maxWidth:280});
+  bindPlatformTooltip(loc,m);
   m.addTo(map);
   if (!isVisible(loc)) map.removeLayer(m);
   if (loc.labelOn && pinLabelsOn && isVisible(loc)) attachPinLabel(loc,m);
@@ -388,7 +393,7 @@ function agentHeadsetSVG(){return '<svg viewBox="0 0 48 48" aria-hidden="true"><
 function addCustomerMarker(cust) {
   if (!cust.lat||!cust.lng) return;
   const m = L.marker(displayLatLng(cust.lat,cust.lng),{icon:buildCustomerIcon(cust)});
-  m.bindPopup(customerPopupHTML(cust),{maxWidth:240}); if(customerLayerOn) m.addTo(map);
+  m.bindPopup(customerPopupHTML(cust),{maxWidth:240});m.bindTooltip('Customer Sites',{direction:'top',offset:[0,-9],sticky:true});if(customerLayerOn) m.addTo(map);
   customerMarkerMap[cust.id] = m;
 }
 function customerPopupHTML(cust) {
@@ -407,16 +412,43 @@ function customerPopupHTML(cust) {
 // ─── Co-location Offsets ──────────────────────────────────────────────────────
 function buildCoordOffsets() { coordOffsets={}; locations.forEach(l=>coordOffsets[l.id]=0); }
 function scheduleResolveOverlaps() { clearTimeout(overlapTimer); overlapTimer=setTimeout(resolveOverlaps,300); }
-function resolveOverlaps() {
-  if(!map) return;
+function visibleOverlapGroups(){
   const visible=locations.filter(l=>isVisible(l)&&markerMap[l.id]);
-  const platformCounts=locations.reduce((a,l)=>(a[l.platform]=(a[l.platform]||0)+1,a),{});
   const threshold=Math.max(10,14*pinScale*.8), groups=[];
   visible.forEach(loc=>{
     const p=map.latLngToLayerPoint(displayLatLng(loc.lat,loc.lng));
     let group=groups.find(g=>g.some(x=>p.distanceTo(x.point)<threshold));
     const item={loc,point:p}; if(group) group.push(item); else groups.push([item]);
   });
+  return groups;
+}
+function clearGroupedPins(){groupedMarkerLayers.forEach(m=>{try{map.removeLayer(m)}catch{}});groupedMarkerLayers=[];}
+function rainbowGroupIcon(count){
+  const size=Math.round(26*pinScale);
+  return L.divIcon({className:'rainbow-pin-shell',html:`<div class="rainbow-pin" style="width:${size}px;height:${size}px"><span>${count}</span></div>`,iconSize:[size,size],iconAnchor:[size/2,size]});
+}
+function groupedPopupHTML(group){
+  return `<div style="min-width:240px;font-size:11px"><strong style="font-size:13px">🌈 ${group.length} overlapping locations</strong><div style="margin-top:7px">${group.map(({loc})=>`<div class="group-popup-row"><span>${loc.name}</span><small style="color:var(--muted)">${loc.platform}</small><button onclick="openGroupedLocation('${loc.id}')">Details</button></div>`).join('')}</div></div>`;
+}
+function renderGroupedPins(){
+  clearGroupedPins();
+  const groups=visibleOverlapGroups();
+  groups.forEach(group=>group.forEach(({loc})=>map.addLayer(markerMap[loc.id])));
+  groups.filter(group=>group.length>1).forEach(group=>{
+    group.forEach(({loc})=>map.removeLayer(markerMap[loc.id]));
+    const x=group.reduce((n,item)=>n+item.point.x,0)/group.length,y=group.reduce((n,item)=>n+item.point.y,0)/group.length;
+    const platforms=[...new Set(group.map(({loc})=>loc.platform))];
+    const marker=L.marker(map.layerPointToLatLng([x,y]),{icon:rainbowGroupIcon(group.length),zIndexOffset:2000});
+    marker.bindTooltip(platforms.join('<br>'),{direction:'top',sticky:true});marker.bindPopup(groupedPopupHTML(group),{maxWidth:360});marker.addTo(map);groupedMarkerLayers.push(marker);
+  });
+}
+function resolveOverlaps() {
+  if(!map) return;
+  if(groupPinsMode){renderGroupedPins();return;}
+  clearGroupedPins();
+  const groups=visibleOverlapGroups();
+  groups.forEach(group=>group.forEach(({loc})=>map.addLayer(markerMap[loc.id])));
+  const platformCounts=locations.reduce((a,l)=>(a[l.platform]=(a[l.platform]||0)+1,a),{});
   coordOffsets={};
   groups.forEach(group=>group.sort((a,b)=>(platformCounts[b.loc.platform]||0)-(platformCounts[a.loc.platform]||0)||a.loc.name.localeCompare(b.loc.name)).forEach((item,i)=>{
     coordOffsets[item.loc.id]=i;
@@ -424,6 +456,9 @@ function resolveOverlaps() {
   }));
   refreshMarkerIcons(false);
 }
+function toggleGroupPins(force){groupPinsMode=typeof force==='boolean'?force:!groupPinsMode;updateGroupPinsBtn();persist();applyAllVisibility();}
+function updateGroupPinsBtn(){const b=document.getElementById('group-pins-btn');if(b)b.classList.toggle('active',groupPinsMode);}
+function openGroupedLocation(id){toggleGroupPins(false);setTimeout(()=>{flyTo(id);setTimeout(()=>markerMap[id]?.openPopup(),250)},50);}
 
 function refreshMarkerIcons(resolve=true) {
   locations.forEach(l=>{const m=markerMap[l.id];if(m)m.setIcon(buildIcon(l.type,l.icon||'circle',coordOffsets[l.id]||0));});
@@ -574,14 +609,15 @@ document.addEventListener('click',()=>{ if(openDdId) closeDD(openDdId); });
 function attachPinLabel(loc,marker) {
   try{marker.unbindTooltip();}catch{}
   const text=loc.label||loc.name; if(!text) return;
-  marker.bindTooltip(text,{permanent:true,direction:'top',offset:[0,-8],className:'pin-label',pane:'pinLabelPane',sticky:false});
+  marker.bindTooltip(`${text}<br><small>${loc.platform||''}</small>`,{permanent:true,direction:'top',offset:[0,-8],className:'pin-label',pane:'pinLabelPane',sticky:false});
   pinLabels[loc.id]=true;
 }
+function bindPlatformTooltip(loc,marker){marker.bindTooltip(loc.platform||'Location',{direction:'top',offset:[0,-7],sticky:true});}
 function refreshAllPinLabels() {
   locations.forEach(loc=>{
     const m=markerMap[loc.id]; if(!m) return;
     try{m.unbindTooltip();}catch{}
-    if(loc.labelOn&&pinLabelsOn&&isVisible(loc)) attachPinLabel(loc,m);
+    if(loc.labelOn&&pinLabelsOn&&isVisible(loc)) attachPinLabel(loc,m);else bindPlatformTooltip(loc,m);
   });
 }
 
@@ -721,7 +757,7 @@ function exportMapView() {
     format:'nice-cxone-map-view',version:1,name:name.trim()||'Customer map view',exportedAt:new Date().toISOString(),
     map:{center:[center.lat,center.lng],zoom:map.getZoom(),homeCenter:[...homeCenter],homeZoom},
     visibility:{layerOn:{...layerOn},customerLayerOn,platformFilter:[...platformFilter],hiddenLocationIds:[...hiddenLocationIds]},
-    display:{mapSource,labelsOn,pinLabelsOn,pinScale,overlapOffset,noWrapMode,agentDropColor,theme:document.body.classList.contains('light')?'light':'dark'},
+    display:{mapSource,labelsOn,pinLabelsOn,pinScale,overlapOffset,noWrapMode,groupPinsMode,agentDropColor,theme:document.body.classList.contains('light')?'light':'dark'},
     customers,drawings
   };
   dlJSON((slugify(view.name)||'customer-map-view')+'.json',view);
@@ -742,6 +778,7 @@ function importMapView(view) {
   if(['carto','osm','satellite'].includes(display.mapSource))mapSource=display.mapSource;
   labelsOn=display.labelsOn===true;pinLabelsOn=display.pinLabelsOn!==false;
   pinScale=Math.min(1.6,Math.max(.6,Number(display.pinScale)||1));noWrapMode=display.noWrapMode===true;
+  groupPinsMode=display.groupPinsMode===true;
   overlapOffset=Math.min(1,Math.max(.2,Number(display.overlapOffset)||.2));
   if(/^#[0-9a-f]{6}$/i.test(display.agentDropColor||''))agentDropColor=display.agentDropColor;
   if(Array.isArray(view.map?.homeCenter)&&view.map.homeCenter.length===2&&view.map.homeCenter.every(Number.isFinite))homeCenter=view.map.homeCenter;
@@ -757,7 +794,7 @@ function importMapView(view) {
   const badge=document.getElementById('pf-badge');if(badge){badge.style.display=platformFilter.size?'inline':'none';badge.textContent=platformFilter.size||'';}
   document.getElementById('pf-btn').classList.toggle('active',platformFilter.size>0);
   renderLayerButtons();setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
-  updateThemeBtn();updateNoWrapBtn();applyTiles();refreshMarkerIcons();applyAllVisibility();renderCustomerPanel();updateCounts();
+  updateThemeBtn();updateNoWrapBtn();updateGroupPinsBtn();applyTiles();refreshMarkerIcons();applyAllVisibility();renderCustomerPanel();updateCounts();
   if(Array.isArray(view.map?.center)&&Number.isFinite(view.map?.zoom))map.setView(view.map.center,view.map.zoom);
   showToast(`Map view "${view.name||'Imported'}" loaded ✓`);
 }
@@ -841,6 +878,7 @@ function persist() {
   localStorage.setItem('nice_homecenter',JSON.stringify(homeCenter));
   localStorage.setItem('nice_homezoom',String(homeZoom));
   localStorage.setItem('nice_nowrap',noWrapMode?'1':'0');
+  localStorage.setItem('nice_grouppins',groupPinsMode?'1':'0');
   document.getElementById('source-badge').textContent='Local';
 }
 
