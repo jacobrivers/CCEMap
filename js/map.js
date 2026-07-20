@@ -189,8 +189,10 @@ function applyTiles() {
   const opts = { noWrap: noWrapMode, maxZoom:19, minZoom:1 };
   if (mapSource === 'satellite') {
     tileLayerBase = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {...opts, attribution:'Tiles © Esri'}).addTo(map);
+    if (labelsOn) tileLayerRef = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {...opts, pane:'overlayPane', zIndex:500, attribution:'Labels © CARTO'}).addTo(map);
   } else if (mapSource === 'osm') {
-    tileLayerBase = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {...opts, attribution:'© OpenStreetMap contributors'}).addTo(map);
+    tileLayerBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_nolabels/{z}/{x}/{y}{r}.png', {...opts, attribution:'© OpenStreetMap contributors © CARTO'}).addTo(map);
+    if (labelsOn) tileLayerRef = L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager_only_labels/{z}/{x}/{y}{r}.png', {...opts, pane:'overlayPane', zIndex:500}).addTo(map);
   } else if (dark) {
     tileLayerBase = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', opts).addTo(map);
     if (labelsOn) tileLayerRef = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {...opts, pane:'overlayPane', zIndex:500}).addTo(map);
