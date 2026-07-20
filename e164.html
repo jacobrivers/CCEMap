@@ -12,6 +12,7 @@
     <a class="back" href="index.html">← Coverage map</a>
     <div class="title"><strong>NiCE <span>CXone</span></strong><small>E.164 Country Calling Code Map</small></div>
     <div class="header-actions">
+      <label>Display <select id="display-mode"><option value="codes">Country codes</option><option value="regions">Numbering regions</option><option value="uniform">Uniform codes</option></select></label>
       <label>Map source <select id="map-source"><option value="carto">Theme matched</option><option value="osm">OpenStreetMap</option><option value="satellite">Satellite</option></select></label>
       <button id="theme-button" type="button">🌙 Dark</button>
       <button id="world-button" type="button">🌍 Show world</button>
@@ -27,7 +28,7 @@
       </div>
       <div class="summary"><span id="count">Loading…</span><button id="clear-button" type="button">Clear search</button></div>
       <div id="results" class="results" role="list"></div>
-      <footer>Country calling assignments follow ITU-T E.164. Colors represent numbering zones +1 through +9.</footer>
+      <footer id="display-description">Country calling assignments follow ITU-T E.164. Regional colors show numbering zones; large zone labels are hidden so country codes remain clear.</footer>
     </aside>
   </main>
   <div id="loading">Loading E.164 map…</div>

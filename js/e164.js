@@ -1,6 +1,7 @@
 let map, baseLayer, countries=[], boundaries=null, thematicLayer=null, selectedIso=null;
 let theme=localStorage.getItem('e164_theme')||'dark';
 let mapSource=localStorage.getItem('e164_mapsource')||'carto';
+let displayMode=localStorage.getItem('e164_displaymode')||'codes';
 
 const COLORS={'1':'#1597c7','2':'#27ae60','3':'#ba68c8','4':'#e64a45','5':'#bfd82f','6':'#e663b5','7':'#d98b4e','8':'#16b6b2','9':'#f2b705'};
 const ZONES=[['1',50,-112],['2',4,16],['3',53,5],['4',61,18],['5',-23,-61],['6',-26,130],['7',55,80],['8',31,128],['9',23,69]];
@@ -27,8 +28,9 @@ async function boot(){
   map.createPane('codes');map.getPane('codes').style.zIndex=650;
   [countries,boundaries]=await Promise.all([fetch('data/e164-countries.json').then(r=>r.json()),fetch('data/world-countries.geojson').then(r=>r.json())]);
   document.getElementById('map-source').value=mapSource;
+  document.getElementById('display-mode').value=displayMode;
   [...new Set(countries.map(c=>c.region))].sort().forEach(region=>document.getElementById('region').add(new Option(region,region)));
-  applyBaseLayer();renderThematicMap();renderResults();updateThemeButton();
+  applyBaseLayer();renderThematicMap();renderResults();updateThemeButton();updateDisplayDescription();
   document.getElementById('loading').classList.add('hidden');
 }
 
@@ -48,11 +50,20 @@ function codeIcon(country){
 function renderThematicMap(){
   if(thematicLayer)map.removeLayer(thematicLayer);
   thematicLayer=L.layerGroup().addTo(map);
+  const showCountryCodes=displayMode!=='regions';
+  const showZoneLabels=displayMode==='regions';
+  const showRegionColors=displayMode!=='uniform';
   const byIso3=Object.fromEntries(countries.map(c=>[c.iso3,c]));
-  L.geoJSON(boundaries,{pane:'countries',style:feature=>{const c=byIso3[feature.id],selected=c?.iso2===selectedIso;return{color:selected?'#fff':'rgba(255,255,255,.75)',weight:selected?3:.65,fillColor:COLORS[zone(c)]||'#94a3b8',fillOpacity:c ? (selected ? .98 : .86) : .13}},onEachFeature:(feature,layer)=>{const c=byIso3[feature.id];if(!c)return;layer.bindTooltip(`<strong>${c.flag} ${c.name}</strong><br>${c.code} · ${c.region}${c.subregion?' / '+c.subregion:''}`,{sticky:true});layer.on('click',()=>selectCountry(c.iso2))}}).addTo(thematicLayer);
-  countries.forEach(c=>{const marker=L.marker([c.lat,c.lng],{pane:'codes',icon:codeIcon(c),keyboard:true});marker.bindTooltip(`<strong>${c.flag} ${c.name}</strong><br>${c.code} · ${c.region}${c.subregion?' / '+c.subregion:''}`,{direction:'top'});marker.on('click',()=>selectCountry(c.iso2));marker.addTo(thematicLayer)});
-  ZONES.forEach(([digit,lat,lng])=>L.marker([lat,lng],{pane:'codes',interactive:false,icon:L.divIcon({className:'zone-label-shell',html:`<div class="zone-label" style="color:${COLORS[digit]}">+${digit}</div>`,iconSize:[68,48],iconAnchor:[34,24]})}).addTo(thematicLayer));
+  L.geoJSON(boundaries,{pane:'countries',style:feature=>{const c=byIso3[feature.id],selected=c?.iso2===selectedIso;return{color:selected?'#fff':'rgba(255,255,255,.75)',weight:selected?3:.65,fillColor:showRegionColors?(COLORS[zone(c)]||'#94a3b8'):'#64748b',fillOpacity:c ? (selected ? .98 : .86) : .13}},onEachFeature:(feature,layer)=>{const c=byIso3[feature.id];if(!c)return;layer.bindTooltip(`<strong>${c.flag} ${c.name}</strong><br>${c.code} · ${c.region}${c.subregion?' / '+c.subregion:''}`,{sticky:true});layer.on('click',()=>selectCountry(c.iso2))}}).addTo(thematicLayer);
+  if(showCountryCodes)countries.forEach(c=>{const marker=L.marker([c.lat,c.lng],{pane:'codes',icon:codeIcon(c),keyboard:true});marker.bindTooltip(`<strong>${c.flag} ${c.name}</strong><br>${c.code} · ${c.region}${c.subregion?' / '+c.subregion:''}`,{direction:'top'});marker.on('click',()=>selectCountry(c.iso2));marker.addTo(thematicLayer)});
+  if(showZoneLabels)ZONES.forEach(([digit,lat,lng])=>L.marker([lat,lng],{pane:'codes',interactive:false,icon:L.divIcon({className:'zone-label-shell',html:`<div class="zone-label" style="color:${COLORS[digit]}">+${digit}</div>`,iconSize:[68,48],iconAnchor:[34,24]})}).addTo(thematicLayer));
 }
+
+function updateDisplayDescription(){
+  const descriptions={codes:'Regional colors show numbering zones; large zone labels are hidden so country codes remain clear.',regions:'Regional colors and large +1 through +9 labels show the global E.164 numbering zones.',uniform:'Countries use one neutral color so the individual calling codes are the focus.'};
+  document.getElementById('display-description').textContent=`Country calling assignments follow ITU-T E.164. ${descriptions[displayMode]}`;
+}
+function setDisplayMode(mode){displayMode=mode;localStorage.setItem('e164_displaymode',mode);renderThematicMap();updateDisplayDescription()}
 
 function filteredCountries(){const q=normalize(document.getElementById('search').value),region=document.getElementById('region').value;return countries.filter(c=>(!region||c.region===region)&&fuzzyMatch(c,q))}
 function renderResults(){
@@ -71,5 +82,6 @@ document.getElementById('region').addEventListener('change',renderResults);
 document.getElementById('clear-button').addEventListener('click',()=>{document.getElementById('search').value='';document.getElementById('region').value='';renderResults()});
 document.getElementById('world-button').addEventListener('click',showWorld);
 document.getElementById('theme-button').addEventListener('click',toggleTheme);
+document.getElementById('display-mode').addEventListener('change',event=>setDisplayMode(event.target.value));
 document.getElementById('map-source').addEventListener('change',event=>{mapSource=event.target.value;localStorage.setItem('e164_mapsource',mapSource);applyBaseLayer()});
 boot().catch(error=>{console.error(error);document.getElementById('loading').textContent='The E.164 map could not be loaded.'});
