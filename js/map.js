@@ -51,7 +51,15 @@ async function boot() {
   setLoadMsg('Loading manifest…');
   const netManifest = await fetchJSON('data/manifest.json');
   const lsManifest = tryParse(localStorage.getItem('nice_manifest'), null);
-  manifest = lsManifest || netManifest || { platforms: [] };
+  // GitHub-defined groupings are authoritative and must never disappear because
+  // a visitor has an older locally-saved manifest. Keep local-only additions too.
+  const netPlatforms = Array.isArray(netManifest?.platforms) ? netManifest.platforms : [];
+  const localPlatforms = Array.isArray(lsManifest?.platforms) ? lsManifest.platforms : [];
+  manifest = {
+    ...(netManifest || {}),
+    ...(lsManifest || {}),
+    platforms: [...new Set([...netPlatforms, ...localPlatforms])]
+  };
 
   setLoadMsg('Loading marker types…');
   const netTypes = await fetchJSON('data/marker-types.json');
