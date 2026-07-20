@@ -38,5 +38,10 @@
     "key": "cognigyai",
     "color": "#84cc16",
     "label": "Cognigy AI"
+  },
+  {
+    "key": "outboundengage",
+    "color": "#f97316",
+    "label": "Outbound Engage"
   }
 ]

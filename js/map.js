@@ -357,6 +357,10 @@ function popupHTML(loc) {
     <span style="color:#64748b">Region: ${loc.region||'—'}</span><br>
     ${loc.endpoint?`<span style="color:#64748b">Endpoint: <strong>${loc.endpoint}</strong></span><br>`:''}
     ${Array.isArray(loc.ips)&&loc.ips.length?`<span style="color:#64748b">${loc.ipPurpose||'IPs'}: ${loc.ips.join(', ')}</span><br>`:''}
+    ${loc.awsRegion?`<span style="color:#64748b">AWS Region: ${loc.awsRegion}</span><br>`:''}
+    ${loc.transport?`<span style="color:#64748b">Transport: ${loc.transport}</span><br>`:''}
+    ${loc.facility?`<span style="color:#64748b">Facility: ${loc.facility}</span><br>`:''}
+    ${loc.address?`<span style="color:#64748b">${loc.address}</span><br>`:''}
     <div style="display:flex;align-items:center;gap:5px;margin:4px 0">
       <span style="width:8px;height:8px;border-radius:50%;background:${cfg.color||'#888'};display:inline-block;flex-shrink:0"></span>
       <span>${loc.platform||'—'}</span>

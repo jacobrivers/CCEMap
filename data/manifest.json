@@ -7,7 +7,8 @@
     "cxone-fedramp-moderate-aws-cluster",
     "cognigy-voice-cognigy-saas",
     "cognigy-voice-cxone-shared",
-    "cognigy-ai"
+    "cognigy-ai",
+    "outbound-engage"
   ],
   "retiredPlatforms": [
     "cognigy-voice"
