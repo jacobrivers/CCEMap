@@ -1,4 +1,4 @@
-let map, baseLayer, countries=[], boundaries=null, thematicLayer=null, selectedIso=null;
+let map, baseLayer, countries=[], boundaries=null, thematicLayer=null, selectedIso=null, worldMaskLayers=[];
 let theme=localStorage.getItem('e164_theme')||'dark';
 let mapSource=localStorage.getItem('e164_mapsource')||'carto';
 let displayMode=localStorage.getItem('e164_displaymode')||'codes';
@@ -31,6 +31,7 @@ async function boot(){
   map.on('resize',updateWorldWindow);
   map.createPane('countries');map.getPane('countries').style.zIndex=420;
   map.createPane('codes');map.getPane('codes').style.zIndex=650;
+  map.createPane('worldMaskPane');map.getPane('worldMaskPane').style.zIndex=600;
   [countries,boundaries]=await Promise.all([fetch('data/e164-countries.json').then(r=>r.json()),fetch('data/world-countries.geojson').then(r=>r.json())]);
   document.getElementById('map-source').value=mapSource;
   document.getElementById('display-mode').value=displayMode;
@@ -52,12 +53,18 @@ function applyBaseLayer(){
 function displayLng(lng){return noWrapMode?lng+360*Math.round((homeCenter[1]-lng)/360):lng}
 function displayLatLng(lat,lng){return[lat,displayLng(lng)]}
 function canonicalLng(lng){return((lng+180)%360+360)%360-180}
-function singleWorldMinZoom(){return Math.max(1,Math.ceil(Math.log2(Math.max(256,map.getSize().x)/256)))}
 function updateWorldWindow(){
   if(!map)return;
-  map.setMinZoom(noWrapMode?singleWorldMinZoom():1);
+  map.setMinZoom(1);
   map.setMaxBounds(noWrapMode?[[-90,homeCenter[1]-180],[90,homeCenter[1]+180]]:null);
-  if(noWrapMode&&map.getZoom()<map.getMinZoom())map.setZoom(map.getMinZoom(),{animate:false});
+  worldMaskLayers.forEach(layer=>map.removeLayer(layer));worldMaskLayers=[];
+  if(noWrapMode){
+    const west=homeCenter[1]-180,east=homeCenter[1]+180;
+    const color=getComputedStyle(document.body).getPropertyValue('--bg').trim()||'#11151d';
+    const style={pane:'worldMaskPane',stroke:false,fill:true,fillColor:color,fillOpacity:1,interactive:false};
+    worldMaskLayers=[L.rectangle([[-89,west-1080],[89,west]],style),L.rectangle([[-89,east],[89,east+1080]],style)];
+    worldMaskLayers.forEach(layer=>layer.addTo(map));
+  }
 }
 function updateNoWrapButton(){const b=document.getElementById('nowrap-button');b.textContent=noWrapMode?'🌐 No Wrap':'🌍 Wrap';b.classList.toggle('active',noWrapMode)}
 function toggleNoWrap(){noWrapMode=!noWrapMode;localStorage.setItem('e164_nowrap',noWrapMode?'1':'0');applyBaseLayer();renderThematicMap();map.setView(displayLatLng(homeCenter[0],homeCenter[1]),homeZoom);updateNoWrapButton()}

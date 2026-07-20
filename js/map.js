@@ -2,6 +2,7 @@
 
 // ─── State ────────────────────────────────────────────────────────────────────
 let map, tileLayerBase, tileLayerRef;
+let worldMaskLayers = [];
 let locations = [], platformData = {}, manifest = { platforms: [] };
 let typeConfig = {}, platforms = [];
 let customers = [], drawings = [];
@@ -188,6 +189,8 @@ function initMap() {
   map = L.map('map', { center:homeCenter, zoom:homeZoom, worldCopyJump:true, zoomControl:true, attributionControl:false });
   map.createPane('pinLabelPane');
   map.getPane('pinLabelPane').style.zIndex = 700;
+  map.createPane('worldMaskPane');
+  map.getPane('worldMaskPane').style.zIndex = 590;
   applyTiles();
   map.on('contextmenu', e => {
     const modal = document.getElementById('modal');
@@ -238,16 +241,22 @@ function displayLatLng(lat,lng) {
   return [lat,lng+360*Math.round((homeCenter[1]-lng)/360)];
 }
 function canonicalLng(lng){return ((lng+180)%360+360)%360-180;}
-function singleWorldMinZoom(){return Math.max(1,Math.ceil(Math.log2(Math.max(256,map.getSize().x)/256)));}
 function refreshWorldPositions(){
   locations.forEach(loc=>markerMap[loc.id]?.setLatLng(displayLatLng(loc.lat,loc.lng)));
   customers.forEach(c=>customerMarkerMap[c.id]?.setLatLng(displayLatLng(c.lat,c.lng)));
 }
 function updateWorldWindow(){
   if(!map)return;
-  map.setMinZoom(noWrapMode?singleWorldMinZoom():1);
+  map.setMinZoom(1);
   map.setMaxBounds(noWrapMode?[[-90,homeCenter[1]-180],[90,homeCenter[1]+180]]:null);
-  if(noWrapMode&&map.getZoom()<map.getMinZoom())map.setZoom(map.getMinZoom(),{animate:false});
+  worldMaskLayers.forEach(layer=>map.removeLayer(layer));worldMaskLayers=[];
+  if(noWrapMode){
+    const west=homeCenter[1]-180,east=homeCenter[1]+180;
+    const color=getComputedStyle(document.body).getPropertyValue('--bg').trim()||'#0f1117';
+    const style={pane:'worldMaskPane',stroke:false,fill:true,fillColor:color,fillOpacity:1,interactive:false};
+    worldMaskLayers=[L.rectangle([[-89,west-1080],[89,west]],style),L.rectangle([[-89,east],[89,east+1080]],style)];
+    worldMaskLayers.forEach(layer=>layer.addTo(map));
+  }
   refreshWorldPositions();
 }
 
