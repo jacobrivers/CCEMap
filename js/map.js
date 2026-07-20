@@ -202,6 +202,7 @@ function initMap() {
   map.on('click', e => { if (openDdId) closeDD(openDdId); onMapClick(e); });
   map.on('dblclick', onMapDblClick);
   map.on('zoomend moveend', scheduleResolveOverlaps);
+  map.on('resize', updateWorldWindow);
   // Inject popup button style
   const s = document.createElement('style');
   s.textContent = '.pu-btn{background:var(--ctrl);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--fg)}.pu-btn:hover{background:var(--ctrl-hover)}';
@@ -237,13 +238,16 @@ function displayLatLng(lat,lng) {
   return [lat,lng+360*Math.round((homeCenter[1]-lng)/360)];
 }
 function canonicalLng(lng){return ((lng+180)%360+360)%360-180;}
+function singleWorldMinZoom(){return Math.max(1,Math.ceil(Math.log2(Math.max(256,map.getSize().x)/256)));}
 function refreshWorldPositions(){
   locations.forEach(loc=>markerMap[loc.id]?.setLatLng(displayLatLng(loc.lat,loc.lng)));
   customers.forEach(c=>customerMarkerMap[c.id]?.setLatLng(displayLatLng(c.lat,c.lng)));
 }
 function updateWorldWindow(){
   if(!map)return;
+  map.setMinZoom(noWrapMode?singleWorldMinZoom():1);
   map.setMaxBounds(noWrapMode?[[-90,homeCenter[1]-180],[90,homeCenter[1]+180]]:null);
+  if(noWrapMode&&map.getZoom()<map.getMinZoom())map.setZoom(map.getMinZoom(),{animate:false});
   refreshWorldPositions();
 }
 

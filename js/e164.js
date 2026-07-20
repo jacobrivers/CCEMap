@@ -28,6 +28,7 @@ async function boot(){
   if(theme==='light')document.body.classList.add('light');
   map=L.map('map',{center:homeCenter,zoom:homeZoom,minZoom:1,worldCopyJump:true,attributionControl:false});
   map.on('click',event=>{if(centerPickMode)finishCenterPicker(event.latlng)});
+  map.on('resize',updateWorldWindow);
   map.createPane('countries');map.getPane('countries').style.zIndex=420;
   map.createPane('codes');map.getPane('codes').style.zIndex=650;
   [countries,boundaries]=await Promise.all([fetch('data/e164-countries.json').then(r=>r.json()),fetch('data/world-countries.geojson').then(r=>r.json())]);
@@ -51,7 +52,13 @@ function applyBaseLayer(){
 function displayLng(lng){return noWrapMode?lng+360*Math.round((homeCenter[1]-lng)/360):lng}
 function displayLatLng(lat,lng){return[lat,displayLng(lng)]}
 function canonicalLng(lng){return((lng+180)%360+360)%360-180}
-function updateWorldWindow(){if(map)map.setMaxBounds(noWrapMode?[[-90,homeCenter[1]-180],[90,homeCenter[1]+180]]:null)}
+function singleWorldMinZoom(){return Math.max(1,Math.ceil(Math.log2(Math.max(256,map.getSize().x)/256)))}
+function updateWorldWindow(){
+  if(!map)return;
+  map.setMinZoom(noWrapMode?singleWorldMinZoom():1);
+  map.setMaxBounds(noWrapMode?[[-90,homeCenter[1]-180],[90,homeCenter[1]+180]]:null);
+  if(noWrapMode&&map.getZoom()<map.getMinZoom())map.setZoom(map.getMinZoom(),{animate:false});
+}
 function updateNoWrapButton(){const b=document.getElementById('nowrap-button');b.textContent=noWrapMode?'🌐 No Wrap':'🌍 Wrap';b.classList.toggle('active',noWrapMode)}
 function toggleNoWrap(){noWrapMode=!noWrapMode;localStorage.setItem('e164_nowrap',noWrapMode?'1':'0');applyBaseLayer();renderThematicMap();map.setView(displayLatLng(homeCenter[0],homeCenter[1]),homeZoom);updateNoWrapButton()}
 function saveCenter(latlng){homeCenter=[latlng.lat,canonicalLng(latlng.lng)];homeZoom=map.getZoom();localStorage.setItem('e164_homecenter',JSON.stringify(homeCenter));localStorage.setItem('e164_homezoom',String(homeZoom));applyBaseLayer();renderThematicMap();map.setView(displayLatLng(homeCenter[0],homeCenter[1]),homeZoom)}
