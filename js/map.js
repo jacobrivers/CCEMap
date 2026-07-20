@@ -16,6 +16,8 @@ let legendView = 'table', openDdId = null;
 let selIconVal = 'circle', selCustIconVal = 'circle';
 let labelsOn = false, pinLabelsOn = true;
 let customerLayerOn = true, pinScale = 1, overlapOffset = .2;
+let agentDropMode = false, agentDropColor = '#10b981', centerPickMode = false;
+let homeCenter = [20,0], homeZoom = 3;
 let pinLabels = {};
 let noWrapMode = false;
 let drawMode = null, drawingsVisible = true;
@@ -130,6 +132,10 @@ async function boot() {
   pinLabelsOn = localStorage.getItem('nice_pinlabels') !== '0';
   pinScale = Math.min(1.6, Math.max(.6, Number(localStorage.getItem('nice_pinscale')) || 1));
   overlapOffset = Math.min(1, Math.max(.2, Number(localStorage.getItem('nice_overlapoffset')) || .2));
+  agentDropColor = localStorage.getItem('nice_agentcolor') || '#10b981';
+  const savedCenter=tryParse(localStorage.getItem('nice_homecenter'),null);
+  if(Array.isArray(savedCenter)&&savedCenter.length===2&&savedCenter.every(Number.isFinite))homeCenter=savedCenter;
+  homeZoom=Math.min(19,Math.max(1,Number(localStorage.getItem('nice_homezoom'))||3));
   if (localStorage.getItem('nice_theme') === 'light') document.body.classList.add('light');
 
   setLoadMsg('Rendering map…');
@@ -152,6 +158,7 @@ async function boot() {
   document.getElementById('pin-size-value').textContent = Math.round(pinScale*100)+'%';
   document.getElementById('overlap-offset-range').value = Math.round(overlapOffset*100);
   document.getElementById('overlap-offset-value').textContent = Math.round(overlapOffset*100)+'%';
+  document.getElementById('agent-drop-color').value = agentDropColor;
 
   const badge = document.getElementById('source-badge');
   if (badge) badge.textContent = fromLocalStorage ? 'Local' : 'GitHub';
@@ -163,7 +170,7 @@ function setLoadMsg(msg) { const el=document.getElementById('loading-msg'); if(e
 
 // ─── Map Init ─────────────────────────────────────────────────────────────────
 function initMap() {
-  map = L.map('map', { center:[20,0], zoom:3, worldCopyJump:true, zoomControl:true, attributionControl:false });
+  map = L.map('map', { center:homeCenter, zoom:homeZoom, worldCopyJump:true, zoomControl:true, attributionControl:false });
   map.createPane('pinLabelPane');
   map.getPane('pinLabelPane').style.zIndex = 700;
   applyTiles();
@@ -229,6 +236,41 @@ function toggleNoWrap() {
 function updateNoWrapBtn() {
   const btn = document.getElementById('nowrap-btn');
   if (btn) { btn.classList.toggle('active', noWrapMode); btn.textContent = noWrapMode ? '🌐 No Wrap' : '🌍 Wrap'; }
+}
+
+// ─── Saved Map Center ─────────────────────────────────────────────────────────────────────────────────
+function saveHomeCenter(latlng,zoom=map.getZoom()) {
+  homeCenter=[latlng.lat,latlng.lng];homeZoom=zoom;persist();
+  showToast(`Map center saved at ${latlng.lat.toFixed(2)}, ${latlng.lng.toFixed(2)} ✓`);
+}
+function useCurrentViewAsCenter(){saveHomeCenter(map.getCenter(),map.getZoom());}
+function startCenterPicker(){
+  agentDropMode=false;document.body.classList.remove('map-drop-agent');document.getElementById('agent-drop-btn')?.classList.remove('active');
+  setDrawMode(null);centerPickMode=true;document.body.classList.add('map-pick-center');
+  const hint=document.getElementById('draw-hint');if(hint){hint.textContent='Click the map to set the new center';hint.style.display='block';}
+}
+function finishCenterPicker(latlng){
+  centerPickMode=false;document.body.classList.remove('map-pick-center');
+  const hint=document.getElementById('draw-hint');if(hint)hint.style.display='none';
+  map.panTo(latlng);saveHomeCenter(latlng,map.getZoom());
+}
+function goToSavedCenter(){map.flyTo(homeCenter,homeZoom,{duration:.8});}
+function resetMapCenter(){homeCenter=[20,0];homeZoom=3;persist();map.flyTo(homeCenter,homeZoom,{duration:.8});showToast('World center restored ✓');}
+
+// ─── Agent Placement ───────────────────────────────────────────────────────────────────────────────
+function setAgentDropColor(color){agentDropColor=color||'#10b981';localStorage.setItem('nice_agentcolor',agentDropColor);}
+function toggleAgentDropMode(){
+  agentDropMode=!agentDropMode;centerPickMode=false;document.body.classList.remove('map-pick-center');
+  setDrawMode(null);document.body.classList.toggle('map-drop-agent',agentDropMode);
+  document.getElementById('agent-drop-btn')?.classList.toggle('active',agentDropMode);
+  const hint=document.getElementById('draw-hint');if(hint){hint.textContent=agentDropMode?'Click the map to place agents · click Drop Agents again to stop':'';hint.style.display=agentDropMode?'block':'none';}
+}
+function dropAgent(latlng){
+  customerLayerOn=true;setAct('customers',true);
+  const number=customers.filter(c=>c.icon==='agent').length+1;
+  const cust={id:'agent_'+Date.now(),company:'Agents',name:`Agent ${number}`,city:'',country:'',lat:latlng.lat,lng:latlng.lng,color:agentDropColor,icon:'agent',notes:'Placed directly on the map'};
+  customers.push(cust);addCustomerMarker(cust);persist();renderCustomerPanel();renderLayerButtons();updateCounts();
+  showToast(`${cust.name} placed ✓`);
 }
 
 // ─── Theme ────────────────────────────────────────────────────────────────────
@@ -306,9 +348,14 @@ function popupHTML(loc) {
 function buildCustomerIcon(cust) {
   const color = cust.color||'#10b981'; const i = (cust.company||cust.name||'?')[0].toUpperCase();
   const size=Math.round(22*pinScale);
+  if(cust.icon==='agent'){
+    const html=`<div class="agent-marker" style="width:${size}px;height:${size}px;color:${color}">${agentHeadsetSVG()}</div>`;
+    return L.divIcon({html,className:'agent-marker-shell',iconSize:[size,size],iconAnchor:[size/2,size/2]});
+  }
   const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${Math.max(1,Math.round(2*pinScale))}px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:${Math.round(10*pinScale)}px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${i}</div>`;
   return L.divIcon({ html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2] });
 }
+function agentHeadsetSVG(){return '<svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 27v-5a16 16 0 0 1 32 0v5M8 23H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h3V23Zm32 0h3a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-3V23ZM40 35v2a7 7 0 0 1-7 7h-5m0 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"/></svg>'}
 function addCustomerMarker(cust) {
   if (!cust.lat||!cust.lng) return;
   const m = L.marker([cust.lat,cust.lng],{icon:buildCustomerIcon(cust)});
@@ -511,6 +558,7 @@ function refreshAllPinLabels() {
 
 // ─── Drawing System ───────────────────────────────────────────────────────────
 function setDrawMode(mode) {
+  if(mode){agentDropMode=false;centerPickMode=false;document.body.classList.remove('map-drop-agent','map-pick-center');document.getElementById('agent-drop-btn')?.classList.remove('active');}
   drawMode=mode; drawingInProgress={points:[]};
   document.querySelectorAll('.dm-btn[data-mode]').forEach(b=>b.classList.toggle('active',b.dataset.mode===(mode||'')));
   ['map-draw-line','map-draw-curve','map-draw-text'].forEach(c=>document.body.classList.remove(c));
@@ -524,6 +572,8 @@ function setDrawMode(mode) {
 }
 
 function onMapClick(e) {
+  if(centerPickMode){finishCenterPicker(e.latlng);return;}
+  if(agentDropMode){dropAgent(e.latlng);return;}
   if(!drawMode) return;
   if(document.getElementById('modal')?.classList.contains('open')) return;
   const {lat,lng}=e.latlng;
@@ -640,9 +690,9 @@ function exportMapView() {
   const center=map.getCenter();
   const view={
     format:'nice-cxone-map-view',version:1,name:name.trim()||'Customer map view',exportedAt:new Date().toISOString(),
-    map:{center:[center.lat,center.lng],zoom:map.getZoom()},
+    map:{center:[center.lat,center.lng],zoom:map.getZoom(),homeCenter:[...homeCenter],homeZoom},
     visibility:{layerOn:{...layerOn},customerLayerOn,platformFilter:[...platformFilter],hiddenLocationIds:[...hiddenLocationIds]},
-    display:{mapSource,labelsOn,pinLabelsOn,pinScale,overlapOffset,noWrapMode,theme:document.body.classList.contains('light')?'light':'dark'},
+    display:{mapSource,labelsOn,pinLabelsOn,pinScale,overlapOffset,noWrapMode,agentDropColor,theme:document.body.classList.contains('light')?'light':'dark'},
     customers,drawings
   };
   dlJSON((slugify(view.name)||'customer-map-view')+'.json',view);
@@ -664,6 +714,9 @@ function importMapView(view) {
   labelsOn=display.labelsOn===true;pinLabelsOn=display.pinLabelsOn!==false;
   pinScale=Math.min(1.6,Math.max(.6,Number(display.pinScale)||1));noWrapMode=display.noWrapMode===true;
   overlapOffset=Math.min(1,Math.max(.2,Number(display.overlapOffset)||.2));
+  if(/^#[0-9a-f]{6}$/i.test(display.agentDropColor||''))agentDropColor=display.agentDropColor;
+  if(Array.isArray(view.map?.homeCenter)&&view.map.homeCenter.length===2&&view.map.homeCenter.every(Number.isFinite))homeCenter=view.map.homeCenter;
+  if(Number.isFinite(view.map?.homeZoom))homeZoom=Math.min(19,Math.max(1,view.map.homeZoom));
   document.body.classList.toggle('light',display.theme==='light');
   document.getElementById('dlbl-map').textContent=labelsOn?'✓':'';
   document.getElementById('dlbl-pin').textContent=pinLabelsOn?'✓':'';
@@ -671,6 +724,7 @@ function importMapView(view) {
   document.getElementById('pin-size-value').textContent=Math.round(pinScale*100)+'%';
   document.getElementById('overlap-offset-range').value=Math.round(overlapOffset*100);
   document.getElementById('overlap-offset-value').textContent=Math.round(overlapOffset*100)+'%';
+  document.getElementById('agent-drop-color').value=agentDropColor;
   const badge=document.getElementById('pf-badge');if(badge){badge.style.display=platformFilter.size?'inline':'none';badge.textContent=platformFilter.size||'';}
   document.getElementById('pf-btn').classList.toggle('active',platformFilter.size>0);
   renderLayerButtons();setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
@@ -754,6 +808,9 @@ function persist() {
   localStorage.setItem('nice_mapsource',mapSource);
   localStorage.setItem('nice_pinscale',String(pinScale));
   localStorage.setItem('nice_overlapoffset',String(overlapOffset));
+  localStorage.setItem('nice_agentcolor',agentDropColor);
+  localStorage.setItem('nice_homecenter',JSON.stringify(homeCenter));
+  localStorage.setItem('nice_homezoom',String(homeZoom));
   document.getElementById('source-badge').textContent='Local';
 }
 
@@ -859,7 +916,7 @@ function renderCustomerPanel() {
   Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).forEach(([company,sites])=>{
     const grp=document.createElement('div'); grp.className='cust-group open';
     grp.innerHTML=`<div class="cust-group-header" onclick="this.parentElement.classList.toggle('open')"><span class="cust-group-arrow">▶</span><span>${company}</span><span style="margin-left:auto;font-size:10px;color:var(--muted)">${sites.length}</span></div>
-    <div class="cust-sites">${sites.map(c=>`<div class="cust-site-row" onclick="flyToCustomer('${c.id}')"><span class="cust-dot" style="background:${c.color||'#10b981'}"></span><span class="cust-site-name">${c.name}</span><span style="color:var(--muted);font-size:10px">${c.city||''}</span><div class="cust-site-actions"><button class="cust-act-btn" onclick="event.stopPropagation();openCustomerModal('${c.id}')" title="Edit">✏️</button><button class="cust-act-btn" onclick="event.stopPropagation();removeCustomer('${c.id}')" title="Remove">🗑</button></div></div>`).join('')}</div>`;
+    <div class="cust-sites">${sites.map(c=>`<div class="cust-site-row" onclick="flyToCustomer('${c.id}')">${c.icon==='agent'?`<span class="cust-agent-icon" style="color:${c.color||'#10b981'}">${agentHeadsetSVG()}</span>`:`<span class="cust-dot" style="background:${c.color||'#10b981'}"></span>`}<span class="cust-site-name">${c.name}</span><span style="color:var(--muted);font-size:10px">${c.city||''}</span><div class="cust-site-actions"><button class="cust-act-btn" onclick="event.stopPropagation();openCustomerModal('${c.id}')" title="Edit">✏️</button><button class="cust-act-btn" onclick="event.stopPropagation();removeCustomer('${c.id}')" title="Remove">🗑</button></div></div>`).join('')}</div>`;
     list.appendChild(grp);
   });
 }

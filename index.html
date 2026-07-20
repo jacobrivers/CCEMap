@@ -56,6 +56,11 @@
     <!-- Add buttons -->
     <button class="ctrl-btn add-btn" onclick="openModal(null)">＋ Add Location</button>
     <button class="ctrl-btn cust-btn" onclick="openCustomerModal(null)">＋ Add Customer</button>
+    <button class="ctrl-btn agent-drop-btn" id="agent-drop-btn" onclick="toggleAgentDropMode()" title="Click, then place agent pins on the map">
+      <svg viewBox="0 0 48 48" aria-hidden="true"><path d="M8 27v-5a16 16 0 0 1 32 0v5M8 23H5a3 3 0 0 0-3 3v8a3 3 0 0 0 3 3h3V23Zm32 0h3a3 3 0 0 1 3 3v8a3 3 0 0 1-3 3h-3V23ZM40 35v2a7 7 0 0 1-7 7h-5m0 0a2 2 0 1 1-4 0 2 2 0 0 1 4 0Z"/></svg>
+      Drop Agents
+    </button>
+    <input class="agent-drop-color" id="agent-drop-color" type="color" value="#10b981" oninput="setAgentDropColor(this.value)" title="Agent outline color"/>
 
     <div class="ctrl-sep"></div>
 
@@ -118,6 +123,18 @@
         <option value="satellite">Satellite</option>
       </select>
     </label>
+
+    <!-- Map Center -->
+    <div class="dd-wrap" id="center-dd">
+      <button class="dd-btn ctrl-btn" id="center-btn" onclick="toggleDD('center-dd',event)">◎ Center</button>
+      <div class="dd-menu">
+        <div class="dd-item" onclick="useCurrentViewAsCenter();closeDD('center-dd')">📌 Use current view</div>
+        <div class="dd-item" onclick="startCenterPicker();closeDD('center-dd')">⌖ Pick center on map</div>
+        <div class="dd-item" onclick="goToSavedCenter();closeDD('center-dd')">◎ Go to saved center</div>
+        <div class="dd-divider"></div>
+        <div class="dd-item" onclick="resetMapCenter();closeDD('center-dd')">🌍 Reset world center</div>
+      </div>
+    </div>
 
     <!-- Platform Filter -->
     <button class="ctrl-btn" id="pf-btn" onclick="openPFModal()">
@@ -313,6 +330,7 @@
           <div class="iopt" data-icon="diamond" onclick="selCustIcon('diamond')">◆ Diamond</div>
           <div class="iopt" data-icon="star" onclick="selCustIcon('star')">★ Star</div>
           <div class="iopt" data-icon="pin" onclick="selCustIcon('pin')">📍 Pin</div>
+          <div class="iopt" data-icon="agent" onclick="selCustIcon('agent')">🎧 Agent</div>
         </div>
       </div>
       <div class="geo-row">
