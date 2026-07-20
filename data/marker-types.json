@@ -23,5 +23,15 @@
     "key": "fedramp",
     "color": "#ef4444",
     "label": "FedRAMP Moderate AWS Cluster"
+  },
+  {
+    "key": "cognigyvoice",
+    "color": "#06b6d4",
+    "label": "Cognigy Voice"
+  },
+  {
+    "key": "cognigyai",
+    "color": "#84cc16",
+    "label": "Cognigy AI"
   }
 ]

@@ -332,6 +332,8 @@ function popupHTML(loc) {
     <strong style="font-size:14px">${loc.name}</strong><br>
     <span style="color:#64748b">${[loc.city,loc.state,loc.country].filter(Boolean).join(', ')}</span><br>
     <span style="color:#64748b">Region: ${loc.region||'—'}</span><br>
+    ${loc.endpoint?`<span style="color:#64748b">Endpoint: <strong>${loc.endpoint}</strong></span><br>`:''}
+    ${Array.isArray(loc.ips)&&loc.ips.length?`<span style="color:#64748b">${loc.ipPurpose||'IPs'}: ${loc.ips.join(', ')}</span><br>`:''}
     <div style="display:flex;align-items:center;gap:5px;margin:4px 0">
       <span style="width:8px;height:8px;border-radius:50%;background:${cfg.color||'#888'};display:inline-block;flex-shrink:0"></span>
       <span>${loc.platform||'—'}</span>

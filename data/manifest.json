@@ -4,6 +4,8 @@
     "fedramp-voice-pop",
     "cxone-production-aws-cluster",
     "cxone-sovereign-aws-cluster",
-    "cxone-fedramp-moderate-aws-cluster"
+    "cxone-fedramp-moderate-aws-cluster",
+    "cognigy-voice",
+    "cognigy-ai"
   ]
 }
