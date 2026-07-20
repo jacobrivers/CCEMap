@@ -37,6 +37,20 @@ function slugify(name) { return (name||'').toLowerCase().replace(/[^a-z0-9]+/g,'
 function unslugify(slug) { return slug.split('-').map(w=>w.charAt(0).toUpperCase()+w.slice(1)).join(' '); }
 function isUSA(v) { return US_VARIANTS.includes((v||'').trim().toLowerCase()); }
 function tryParse(s,fb){ try{return JSON.parse(s)||fb}catch{return fb} }
+function ensureUniqueLocationIds(items) {
+  const seen = new Set();
+  return items.map((loc,index)=>{
+    const base = loc.id || `${slugify(loc.platform||'location')}_${index+1}`;
+    let id = base;
+    if(seen.has(id)) {
+      const suffix = slugify(loc.platform||'group') || 'group';
+      id = `${base}__${suffix}`;
+      let n=2; while(seen.has(id)) id=`${base}__${suffix}_${n++}`;
+    }
+    seen.add(id);
+    return id===loc.id ? loc : {...loc,id};
+  });
+}
 function dlJSON(filename, data) {
   const blob = new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
   const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
@@ -89,7 +103,9 @@ async function boot() {
       platformData[slug] = Array.isArray(netData) ? netData : [];
     }
   }
-  locations = Object.values(platformData).flat();
+  // Marker IDs are registry keys. Normalize collisions so one grouping can never
+  // overwrite another grouping's marker and leave an unremovable orphan pin.
+  locations = ensureUniqueLocationIds(Object.values(platformData).flat());
 
   setLoadMsg('Loading customers & drawings…');
   const lsCust = tryParse(localStorage.getItem('nice_customers'), null);
@@ -631,7 +647,8 @@ function handleImportFile(event) {
           platformData[slug]=Array.isArray(data)?data:[];
           locations.filter(l=>slugify(l.platform)===slug).forEach(l=>{if(markerMap[l.id]){map.removeLayer(markerMap[l.id]);delete markerMap[l.id];}});
           locations=locations.filter(l=>slugify(l.platform)!==slug);
-          locations=[...locations,...platformData[slug]];
+          locations=ensureUniqueLocationIds([...locations,...platformData[slug]]);
+          platformData[slug]=locations.filter(l=>slugify(l.platform)===slug);
           const pname=platformData[slug][0]?.platform||unslugify(slug);
           if(!platforms.find(p=>p.slug===slug)) platforms.push({slug,name:pname});
           buildCoordOffsets();
