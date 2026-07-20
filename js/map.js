@@ -455,6 +455,14 @@ function groupedPopupHTML(group){
 }
 function renderGroupedPins(){
   clearGroupedPins();
+  // Grouping is derived solely from the currently visible set. Clear any
+  // ordinary overlap offsets left by a previous view before restoring markers.
+  buildCoordOffsets();
+  locations.forEach(loc=>{
+    const marker=markerMap[loc.id];if(!marker)return;
+    marker.setIcon(buildIcon(loc.type,loc.icon||'circle',0));
+    marker.setZIndexOffset(0);
+  });
   const groups=visibleOverlapGroups();
   groups.forEach(group=>group.forEach(({loc})=>map.addLayer(markerMap[loc.id])));
   groups.filter(group=>group.length>1).forEach(group=>{
@@ -517,7 +525,7 @@ function resetLocationVisibility(predicate=()=>true) {
 function applyAllVisibility() {
   locations.forEach(loc=>{ const m=markerMap[loc.id]; if(!m) return; isVisible(loc)?map.addLayer(m):map.removeLayer(m); });
   customers.forEach(c=>{const m=customerMarkerMap[c.id];if(!m)return;customerLayerOn?map.addLayer(m):map.removeLayer(m);});
-  updateCounts(); scheduleResolveOverlaps(); refreshAllPinLabels(); renderTable();
+  updateCounts(); resolveOverlaps(); refreshAllPinLabels(); renderTable();
 }
 
 // ─── Stats ────────────────────────────────────────────────────────────────────
