@@ -93,8 +93,14 @@
     <div class="dd-wrap" id="disp-dd">
       <button class="dd-btn ctrl-btn" onclick="toggleDD('disp-dd',event)">Display</button>
       <div class="dd-menu">
-        <div class="dd-item" onclick="toggleLabels()">🗺 Map labels <span id="dlbl-map">✓</span></div>
+        <div class="dd-item" onclick="toggleLabels()">🗺 Map labels <span id="dlbl-map"></span></div>
         <div class="dd-item" onclick="togglePinLabels()">🏷 Pin labels <span id="dlbl-pin">✓</span></div>
+        <div class="dd-divider"></div>
+        <label class="dd-item pin-size-control" onclick="event.stopPropagation()" for="pin-size-range">
+          <span>📍 Pin size</span>
+          <input id="pin-size-range" type="range" min="60" max="160" step="10" value="100" oninput="setPinSize(this.value)"/>
+          <span id="pin-size-value">100%</span>
+        </label>
         <div class="dd-divider"></div>
         <div class="dd-item" onclick="setMapSource('carto');closeDD('disp-dd')">◉ Theme-matched map <span id="map-src-carto">✓</span></div>
         <div class="dd-item" onclick="setMapSource('osm');closeDD('disp-dd')">◉ OpenStreetMap <span id="map-src-osm"></span></div>

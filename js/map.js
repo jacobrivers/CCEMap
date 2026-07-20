@@ -13,7 +13,8 @@ let deletedLoc = null, deletedCustomer = null;
 let sortKey = 'name', sortAsc = true, searchTerm = '';
 let legendView = 'table', openDdId = null;
 let selIconVal = 'circle', selCustIconVal = 'circle';
-let labelsOn = true, pinLabelsOn = true;
+let labelsOn = false, pinLabelsOn = true;
+let customerLayerOn = true, pinScale = 1;
 let pinLabels = {};
 let noWrapMode = false;
 let drawMode = null, drawingsVisible = true;
@@ -99,8 +100,10 @@ async function boot() {
   });
   manifest.platforms.forEach(s => { layerOn[s] = true; });
 
-  labelsOn = localStorage.getItem('nice_labels') !== '0';
+  // Labels default off for first-time visitors; retain an explicit saved choice.
+  labelsOn = localStorage.getItem('nice_labels') === '1';
   pinLabelsOn = localStorage.getItem('nice_pinlabels') !== '0';
+  pinScale = Math.min(1.6, Math.max(.6, Number(localStorage.getItem('nice_pinscale')) || 1));
   if (localStorage.getItem('nice_theme') === 'light') document.body.classList.add('light');
 
   setLoadMsg('Rendering map…');
@@ -109,6 +112,7 @@ async function boot() {
   buildCoordOffsets();
   locations.forEach(addMarker);
   customers.forEach(addCustomerMarker);
+  scheduleResolveOverlaps();
   renderDrawings();
   updateCounts();
   renderTable();
@@ -118,6 +122,8 @@ async function boot() {
   updateNoWrapBtn();
   document.getElementById('dlbl-map').textContent = labelsOn ? '✓' : '';
   document.getElementById('dlbl-pin').textContent = pinLabelsOn ? '✓' : '';
+  document.getElementById('pin-size-range').value = Math.round(pinScale*100);
+  document.getElementById('pin-size-value').textContent = Math.round(pinScale*100)+'%';
 
   const badge = document.getElementById('source-badge');
   if (badge) badge.textContent = fromLocalStorage ? 'Local' : 'GitHub';
@@ -145,6 +151,7 @@ function initMap() {
   });
   map.on('click', e => { if (openDdId) closeDD(openDdId); onMapClick(e); });
   map.on('dblclick', onMapDblClick);
+  map.on('zoomend moveend', scheduleResolveOverlaps);
   // Inject popup button style
   const s = document.createElement('style');
   s.textContent = '.pu-btn{background:var(--ctrl);border:1px solid var(--border);border-radius:5px;padding:3px 8px;cursor:pointer;font-size:11px;color:var(--fg)}.pu-btn:hover{background:var(--ctrl-hover)}';
@@ -207,17 +214,26 @@ function updateThemeBtn() {
 function toggleLabels() { labelsOn = !labelsOn; applyTiles(); persist(); document.getElementById('dlbl-map').textContent = labelsOn?'✓':''; }
 function togglePinLabels() { pinLabelsOn = !pinLabelsOn; refreshAllPinLabels(); persist(); document.getElementById('dlbl-pin').textContent = pinLabelsOn?'✓':''; }
 
+function setPinSize(percent) {
+  pinScale = Math.min(1.6, Math.max(.6, Number(percent)/100 || 1));
+  document.getElementById('pin-size-value').textContent = Math.round(pinScale*100)+'%';
+  refreshMarkerIcons();
+  persist();
+}
+
 // ─── Icons & Markers ──────────────────────────────────────────────────────────
 function buildIcon(type, shape, offsetIdx=0) {
-  const cfg = typeConfig[type] || {}; const color = cfg.color||'#2B8EFF'; const o = offsetIdx*5;
+  const cfg = typeConfig[type] || {}; const color = cfg.color||'#2B8EFF';
+  const size = Math.round(14*pinScale); const o = offsetIdx*size*.2;
+  const border = Math.max(1,Math.round(2*pinScale));
   const S = {
-    circle:  `<div style="width:14px;height:14px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-    pin:     `<div style="font-size:18px;line-height:1;color:${color}">📍</div>`,
-    star:    `<div style="font-size:16px;line-height:1;color:${color}">★</div>`,
-    square:  `<div style="width:13px;height:13px;background:${color};border:2px solid rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
-    diamond: `<div style="width:12px;height:12px;background:${color};border:2px solid rgba(255,255,255,.6);transform:rotate(45deg);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    circle:  `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${border}px solid rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    pin:     `<div style="font-size:${Math.round(18*pinScale)}px;line-height:1;color:${color}">📍</div>`,
+    star:    `<div style="font-size:${Math.round(16*pinScale)}px;line-height:1;color:${color}">★</div>`,
+    square:  `<div style="width:${Math.round(13*pinScale)}px;height:${Math.round(13*pinScale)}px;background:${color};border:${border}px solid rgba(255,255,255,.6);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
+    diamond: `<div style="width:${Math.round(12*pinScale)}px;height:${Math.round(12*pinScale)}px;background:${color};border:${border}px solid rgba(255,255,255,.6);transform:rotate(45deg);box-shadow:0 1px 4px rgba(0,0,0,.4)"></div>`,
   };
-  return L.divIcon({ html: S[shape]||S.circle, className:'', iconSize:[14,14], iconAnchor:[7+o,7] });
+  return L.divIcon({ html: S[shape]||S.circle, className:'', iconSize:[size,size], iconAnchor:[size/2-o,size/2] });
 }
 
 function addMarker(loc) {
@@ -251,13 +267,14 @@ function popupHTML(loc) {
 // ─── Customer Markers ─────────────────────────────────────────────────────────
 function buildCustomerIcon(cust) {
   const color = cust.color||'#10b981'; const i = (cust.company||cust.name||'?')[0].toUpperCase();
-  const html = `<div style="width:22px;height:22px;border-radius:50%;background:${color};border:2px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${i}</div>`;
-  return L.divIcon({ html, className:'', iconSize:[22,22], iconAnchor:[11,11] });
+  const size=Math.round(22*pinScale);
+  const html = `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${Math.max(1,Math.round(2*pinScale))}px solid rgba(255,255,255,.8);display:flex;align-items:center;justify-content:center;font-size:${Math.round(10*pinScale)}px;font-weight:700;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.4)">${i}</div>`;
+  return L.divIcon({ html, className:'', iconSize:[size,size], iconAnchor:[size/2,size/2] });
 }
 function addCustomerMarker(cust) {
   if (!cust.lat||!cust.lng) return;
   const m = L.marker([cust.lat,cust.lng],{icon:buildCustomerIcon(cust)});
-  m.bindPopup(customerPopupHTML(cust),{maxWidth:240}); m.addTo(map);
+  m.bindPopup(customerPopupHTML(cust),{maxWidth:240}); if(customerLayerOn) m.addTo(map);
   customerMarkerMap[cust.id] = m;
 }
 function customerPopupHTML(cust) {
@@ -274,16 +291,30 @@ function customerPopupHTML(cust) {
 }
 
 // ─── Co-location Offsets ──────────────────────────────────────────────────────
-function buildCoordOffsets() {
-  const g={};
-  locations.forEach(l=>{ const k=`${l.lat},${l.lng}`; if(!g[k]) g[k]=[]; g[k].push(l.id); });
-  coordOffsets={};
-  Object.values(g).forEach(ids=>ids.forEach((id,i)=>coordOffsets[id]=i));
-}
+function buildCoordOffsets() { coordOffsets={}; locations.forEach(l=>coordOffsets[l.id]=0); }
 function scheduleResolveOverlaps() { clearTimeout(overlapTimer); overlapTimer=setTimeout(resolveOverlaps,300); }
 function resolveOverlaps() {
-  buildCoordOffsets();
-  locations.forEach(l=>{ const m=markerMap[l.id]; if(m) m.setIcon(buildIcon(l.type,l.icon||'circle',coordOffsets[l.id]||0)); });
+  if(!map) return;
+  const visible=locations.filter(l=>isVisible(l)&&markerMap[l.id]);
+  const platformCounts=locations.reduce((a,l)=>(a[l.platform]=(a[l.platform]||0)+1,a),{});
+  const threshold=Math.max(10,14*pinScale*.8), groups=[];
+  visible.forEach(loc=>{
+    const p=map.latLngToLayerPoint([loc.lat,loc.lng]);
+    let group=groups.find(g=>g.some(x=>p.distanceTo(x.point)<threshold));
+    const item={loc,point:p}; if(group) group.push(item); else groups.push([item]);
+  });
+  coordOffsets={};
+  groups.forEach(group=>group.sort((a,b)=>(platformCounts[b.loc.platform]||0)-(platformCounts[a.loc.platform]||0)||a.loc.name.localeCompare(b.loc.name)).forEach((item,i)=>{
+    coordOffsets[item.loc.id]=i;
+    markerMap[item.loc.id].setZIndexOffset(1000-i);
+  }));
+  refreshMarkerIcons(false);
+}
+
+function refreshMarkerIcons(resolve=true) {
+  locations.forEach(l=>{const m=markerMap[l.id];if(m)m.setIcon(buildIcon(l.type,l.icon||'circle',coordOffsets[l.id]||0));});
+  customers.forEach(c=>{const m=customerMarkerMap[c.id];if(m)m.setIcon(buildCustomerIcon(c));});
+  if(resolve) scheduleResolveOverlaps();
 }
 
 // ─── Visibility ───────────────────────────────────────────────────────────────
@@ -294,6 +325,7 @@ function isVisible(loc) {
 }
 function applyAllVisibility() {
   locations.forEach(loc=>{ const m=markerMap[loc.id]; if(!m) return; isVisible(loc)?map.addLayer(m):map.removeLayer(m); });
+  customers.forEach(c=>{const m=customerMarkerMap[c.id];if(!m)return;customerLayerOn?map.addLayer(m):map.removeLayer(m);});
   updateCounts(); scheduleResolveOverlaps();
 }
 
@@ -322,13 +354,17 @@ function renderLayerButtons() {
     const modeType = typesHere.length ? [...typesHere].sort((a,b)=>typesHere.filter(t=>t===b).length-typesHere.filter(t=>t===a).length)[0] : '';
     const color = (typeConfig[modeType]||{}).color||'#2B8EFF';
     const btn = document.createElement('button');
-    btn.className='layer-btn active'; btn.dataset.layer=slug;
+    btn.className='layer-btn'+(layerOn[slug]===false?'':' active'); btn.dataset.layer=slug;
     btn.style.color=color; btn.style.borderColor=color;
     // Clickable dot opens color picker; button text toggles layer
     btn.innerHTML=`<span class="layer-color-dot" data-type="${modeType}" data-slug="${slug}" style="background:${color}" title="Click dot to change color" onclick="event.stopPropagation();pickLayerColor('${slug}','${modeType}',this)"></span>${name} <span class="cnt" id="cnt-${slug}">—</span>`;
     btn.onclick=()=>toggleLayer(slug);
     cont.appendChild(btn);
   });
+  const btn=document.createElement('button');
+  btn.className='layer-btn'+(customerLayerOn?' active':''); btn.dataset.layer='customers'; btn.style.color='#10b981'; btn.style.borderColor='#10b981';
+  btn.innerHTML=`<span class="layer-color-dot" style="background:#10b981"></span>Customer Sites <span class="cnt">${customers.length}</span>`;
+  btn.onclick=()=>toggleLayer('customers'); cont.appendChild(btn);
 }
 
 function pickLayerColor(slug, type, dotEl) {
@@ -354,12 +390,16 @@ function pickLayerColor(slug, type, dotEl) {
 }
 function toggleLayer(slug) {
   if (slug==='all') {
-    const on=Object.values(layerOn).some(v=>v===false);
+    const on=Object.values(layerOn).some(v=>v===false)||!customerLayerOn;
     manifest.platforms.forEach(s=>{layerOn[s]=on; setAct(s,on);}); setAct('all',on);
+    customerLayerOn=on; setAct('customers',on);
+  } else if(slug==='customers') {
+    customerLayerOn=!customerLayerOn; setAct('customers',customerLayerOn);
+    setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
   } else {
     layerOn[slug]=layerOn[slug]===false?true:false;
     setAct(slug,layerOn[slug]!==false);
-    setAct('all',manifest.platforms.every(s=>layerOn[s]!==false));
+    setAct('all',customerLayerOn&&manifest.platforms.every(s=>layerOn[s]!==false));
   }
   applyAllVisibility();
 }
@@ -613,6 +653,7 @@ function persist() {
   localStorage.setItem('nice_labels',labelsOn?'1':'0');
   localStorage.setItem('nice_pinlabels',pinLabelsOn?'1':'0');
   localStorage.setItem('nice_mapsource',mapSource);
+  localStorage.setItem('nice_pinscale',String(pinScale));
   document.getElementById('source-badge').textContent='Local';
 }
 
@@ -761,15 +802,15 @@ function saveCustomerModal() {
     const cust={id:'cust_'+Date.now(),...data}; customers.push(cust); addCustomerMarker(cust);
     map.flyTo([lat,lng],Math.max(map.getZoom(),5),{duration:1.2});
   }
-  persist();renderCustomerPanel();updateCounts();closeCustomerModal();showToast('Customer site saved');
+  persist();renderCustomerPanel();renderLayerButtons();updateCounts();closeCustomerModal();showToast('Customer site saved');
 }
 function removeCustomer(id) {
   const c=customers.find(x=>x.id===id); if(!c) return;
   deletedCustomer=c; customers=customers.filter(x=>x.id!==id);
   const m=customerMarkerMap[id]; if(m) map.removeLayer(m); delete customerMarkerMap[id];
-  persist();renderCustomerPanel();updateCounts();showToast(`"${c.name}" removed`,true);
+  persist();renderCustomerPanel();renderLayerButtons();updateCounts();showToast(`"${c.name}" removed`,true);
 }
-function undoCustomerDelete(){if(!deletedCustomer) return;customers.push(deletedCustomer);addCustomerMarker(deletedCustomer);persist();renderCustomerPanel();updateCounts();deletedCustomer=null;}
+function undoCustomerDelete(){if(!deletedCustomer) return;customers.push(deletedCustomer);addCustomerMarker(deletedCustomer);persist();renderCustomerPanel();renderLayerButtons();updateCounts();deletedCustomer=null;}
 
 // ─── Location Modal ───────────────────────────────────────────────────────────
 function buildRegionSelect(current) {
