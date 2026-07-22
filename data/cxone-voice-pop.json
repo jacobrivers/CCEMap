@@ -338,5 +338,35 @@
     "labelOn": false,
     "provider": "Equinix",
     "address": "18155 Technology Dr, Culpeper, VA 22701"
+  },
+  {
+    "id": "c_1784724404692",
+    "name": "Etisalat DB2",
+    "city": "Dubai",
+    "state": "",
+    "country": "UAE",
+    "region": "Middle East",
+    "platform": "CXone Voice POP",
+    "type": "voicepop",
+    "icon": "circle",
+    "lat": 25.0743,
+    "lng": 55.1885,
+    "label": "",
+    "labelOn": false
+  },
+  {
+    "id": "c_1784724444122",
+    "name": "Etisalat AD2",
+    "city": "abu dhabi",
+    "state": "",
+    "country": "UAE",
+    "region": "Middle East",
+    "platform": "CXone Voice POP",
+    "type": "voicepop",
+    "icon": "circle",
+    "lat": 24.4538,
+    "lng": 54.3774,
+    "label": "",
+    "labelOn": false
   }
 ]
